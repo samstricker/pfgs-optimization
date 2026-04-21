@@ -1,0 +1,31 @@
+name: MyPy Type Checks
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Sync environment
+        run: uv sync --dev
+        
+      - name: Install package
+        run: uv pip install -e .
+
+      - name: Type check
+        run: uv run mypy src --ignore-missing-imports

@@ -1,1 +1,1 @@
-# pfgs-optimization
+# Pareto Front Guided Sampling (PFGS)
