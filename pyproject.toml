@@ -1,10 +1,14 @@
 [project]
-name = "pfgs-optimization"
+name = "paretodo"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["numpy>=2.4.4"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["paretodo*"]
 
 [dependency-groups]
 dev = ["black>=26.3.1", "mypy>=1.20.1", "pylint>=4.0.5", "pytest>=9.0.3"]

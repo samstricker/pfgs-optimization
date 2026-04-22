@@ -2,3 +2,4 @@
 .python*
 .local/*
 **/__pycache__/**
+*.egg*
