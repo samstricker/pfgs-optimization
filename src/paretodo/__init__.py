@@ -6,10 +6,13 @@ from .data_models import (
     OptimizationAxis,
     OptimizationProblem,
 )
+from .sampling import BaseProblem, ParetoFrontGenerator
 
 __all__ = [
     "InvestigationSpace",
     "InvestigationSpaceVariable",
     "OptimizationAxis",
     "OptimizationProblem",
+    "BaseProblem",
+    "ParetoFrontGenerator",
 ]
