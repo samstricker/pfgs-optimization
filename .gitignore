@@ -1,3 +1,4 @@
 # Local Data
 .python*
 .local/*
+**/__pycache__/**
