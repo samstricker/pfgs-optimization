@@ -7,12 +7,14 @@ from .data_models import (
     OptimizationProblem,
 )
 from .sampling import BaseProblem, ParetoFrontGenerator
+from .logging import MlFlowLogger
 
 __all__ = [
+    "BaseProblem",
     "InvestigationSpace",
     "InvestigationSpaceVariable",
+    "MlFlowLogger",
     "OptimizationAxis",
     "OptimizationProblem",
-    "BaseProblem",
     "ParetoFrontGenerator",
 ]
