@@ -69,7 +69,8 @@ class MlFlowLogger:
         df : pl.DataFrame
             Polars DataFrame to log.
         datatype : str
-            Type of the datatype. Supported types are: experiments, meshgrid, pareto_front.
+            Type of the datatype.
+            Supported types are: experiments, meshgrid, pareto_front, selected_recipes.
         iteration : int
             Iteration number to log the artifact under.
         """
@@ -79,10 +80,12 @@ class MlFlowLogger:
             artifact_name = "meshgrid_predictions.csv"
         elif datatype.lower() == "pareto_front":
             artifact_name = "pareto_front_predictions.csv"
+        elif datatype.lower() == "selected_recipes":
+            artifact_name = "selected_recipes.csv"
         else:
             raise ValueError(
                 f"Unsupported datatype: {datatype}. Supported types are:"
-                "experiments, meshgrid, pareto_front."
+                "experiments, meshgrid, pareto_front, selected_recipes."
             )
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_csv_path = os.path.join(temp_dir, artifact_name)
