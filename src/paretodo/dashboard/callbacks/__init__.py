@@ -13,6 +13,7 @@ from . import (
     pareto_front,
     gp_prediction,
     investigation_space,
+    export_download,
 )
 from .data_loading import (
     update_mlflow_experiments_dropdown,
@@ -32,6 +33,7 @@ __all__.extend(experiment_results.__all__)
 __all__.extend(pareto_front.__all__)
 __all__.extend(gp_prediction.__all__)
 __all__.extend(investigation_space.__all__)
+__all__.extend(export_download.__all__)
 __all__.extend(
     [
         "update_mlflow_experiments_dropdown",

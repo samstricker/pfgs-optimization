@@ -3,6 +3,7 @@
 __all__ = [
     "populate_gp_filters",
     "update_gp_predictions",
+    "store_gp_predictions_figures",
 ]
 
 from pathlib import Path
@@ -283,7 +284,8 @@ def update_gp_predictions(
                                 f"<b>{y_label}</b>: %{{y:.4f}}<br>"
                                 f"<b>{z_label}</b>: %{{z:.4f}}<extra></extra>"
                             ),
-                            showlegend=False,
+                            name="GP Prediction",
+                            showlegend=True,
                         ),
                         row=1,
                         col=col,
@@ -373,7 +375,7 @@ def update_gp_predictions(
                                     ),
                                     name=MARKER_NAMES["experiment"],
                                     hovertemplate="<b>Experiment</b><extra></extra>",
-                                    showlegend=False,
+                                    showlegend=True,
                                 ),
                                 row=1,
                                 col=col,
@@ -395,7 +397,7 @@ def update_gp_predictions(
                                     ),
                                     name=MARKER_NAMES["discarded"],
                                     hovertemplate="<b>Experiment (Excluded)</b><extra></extra>",
-                                    showlegend=False,
+                                    showlegend=True,
                                 ),
                                 row=1,
                                 col=col,
@@ -481,7 +483,7 @@ def update_gp_predictions(
                                     ),
                                     name=MARKER_NAMES["pareto"],
                                     hovertemplate="<b>Pareto Point</b><extra></extra>",
-                                    showlegend=False,
+                                    showlegend=True,
                                 ),
                                 row=1,
                                 col=col,
@@ -503,7 +505,7 @@ def update_gp_predictions(
                                     ),
                                     name=MARKER_NAMES["discarded"],
                                     hovertemplate="<b>Pareto Point (Excluded)</b><extra></extra>",
-                                    showlegend=False,
+                                    showlegend=True,
                                 ),
                                 row=1,
                                 col=col,
@@ -551,7 +553,8 @@ def update_gp_predictions(
                                         line=dict(width=2, color="black"),
                                     ),
                                     hovertemplate="<b>Selected Experiment</b><extra></extra>",
-                                    showlegend=False,
+                                    name="Selected Experiment",
+                                    showlegend=True,
                                 ),
                                 row=1,
                                 col=col,
@@ -599,7 +602,8 @@ def update_gp_predictions(
                                         line=dict(width=2, color="black"),
                                     ),
                                     hovertemplate="<b>Selected Pareto Point</b><extra></extra>",
-                                    showlegend=False,
+                                    name="Selected Pareto Point",
+                                    showlegend=True,
                                 ),
                                 row=1,
                                 col=col,
@@ -640,7 +644,8 @@ def update_gp_predictions(
                                         line=dict(width=2, color="black"),
                                     ),
                                     hovertemplate="<b>Auto Selection</b><extra></extra>",
-                                    showlegend=False,
+                                    name="Auto Selection",
+                                    showlegend=True,
                                 ),
                                 row=1,
                                 col=col,
@@ -705,7 +710,8 @@ def update_gp_predictions(
                                     line=dict(color="black", width=2),
                                 ),
                                 hovertemplate=hover_text + "<extra></extra>",
-                                showlegend=False,
+                                name="Reference",
+                                showlegend=True,
                             ),
                             row=1,
                             col=col,
@@ -752,9 +758,12 @@ def update_gp_predictions(
             )
             fig.update_layout(
                 height=500,
-                showlegend=False,
+                showlegend=True,
                 hovermode="closest",
                 title_text=f"GP Prediction: {pred_label}",
+                legend=dict(
+                    orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.2
+                ),
             )
 
             # Create a graph component for this prediction
@@ -785,5 +794,304 @@ def update_gp_predictions(
         return [html.Div(dcc.Graph(figure=fig))]
 
 
-# on Output decorator for gp-predictions-figures-store.data and other data stores
-# to allow multiple callbacks to write to same store if needed
+@app.callback(
+    Output("gp-predictions-figures-store", "data", allow_duplicate=True),
+    Input("mlflow-run", "value"),
+    Input("iteration", "value"),
+    Input({"type": "gp-filter-dropdown", "index": ALL}, "value"),
+    Input("clicked-points-store", "data"),
+    Input("pinned-points-store", "data"),
+    Input("measurement-renames-store", "data"),
+    Input("investigation-space-renames-store", "data"),
+    Input("objectives-bounds-store", "data"),
+    prevent_initial_call=True,
+)
+def store_gp_predictions_figures(
+    mlflow_run: str | None,
+    iteration: str | None,
+    filter_values: list[float],
+    clicked_points: dict,
+    pinned_points: dict | None,
+    measurement_renames: dict,
+    investigation_space_renames: dict,
+    objectives_bounds: dict | None,
+) -> list[dict]:
+    """Store GP prediction figures for download."""
+    if mlflow_run is None or iteration is None:
+        return []
+
+    try:
+        investigation_space = InvestigationSpace.from_json(
+            Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/investigation_space.json")
+        )
+        meshgrid_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/meshgrid_predictions.csv"
+        meshgrid_df = pd.read_csv(meshgrid_csv)
+
+        experiments_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/experiments.csv"
+        try:
+            experiments_df = pd.read_csv(experiments_csv)
+        except FileNotFoundError:
+            experiments_df = pd.DataFrame()
+
+        pareto_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+        try:
+            pareto_df = pd.read_csv(pareto_csv)
+        except FileNotFoundError:
+            pareto_df = pd.DataFrame()
+
+        variables = investigation_space.variables
+        var_names = [v.name for v in variables]
+
+        var_pairs = []
+        pair_variables = []
+        for i in range(0, len(variables), 2):
+            if i + 1 < len(variables):
+                var_pairs.append((variables[i].name, variables[i + 1].name))
+                pair_variables.append([variables[i], variables[i + 1]])
+
+        if len(variables) < 2:
+            return []
+
+        numeric_cols = meshgrid_df.select_dtypes(include=[np.number]).columns.tolist()
+        prediction_cols = [col for col in numeric_cols if col not in var_names]
+
+        if not prediction_cols or not var_pairs:
+            return []
+
+        num_cols = len(var_pairs)
+        var_to_filter = {}
+        if filter_values and len(filter_values) == len(var_names):
+            var_to_filter = dict(zip(var_names, filter_values))
+
+        figures = []
+        prediction_col_ranges = {}
+        for pred_col in prediction_cols:
+            if pred_col in meshgrid_df.columns:
+                pred_min = meshgrid_df[pred_col].min()
+                pred_max = meshgrid_df[pred_col].max()
+                prediction_col_ranges[pred_col] = (pred_min, pred_max)
+
+        for prediction_col in prediction_cols:
+            fig = make_subplots(
+                rows=1,
+                cols=num_cols,
+                specs=[[{"secondary_y": False} for _ in range(num_cols)]],
+                horizontal_spacing=0.12,
+            )
+            fig.update_layout(template=get_theme())
+
+            for col_idx, (var_x, var_y) in enumerate(var_pairs):
+                filtered_df = meshgrid_df.copy()
+                plotted_in_pair = {var_x, var_y}
+                for var_name in var_names:
+                    if var_name not in plotted_in_pair and var_name in var_to_filter:
+                        filter_val = var_to_filter[var_name]
+                        filtered_df = filtered_df[filtered_df[var_name] == filter_val]
+
+                col = col_idx + 1
+                if var_x not in filtered_df.columns or var_y not in filtered_df.columns:
+                    continue
+                if prediction_col not in filtered_df.columns:
+                    continue
+
+                show_colorbar = col_idx == 0
+                try:
+                    x_vals = np.asarray(filtered_df[var_x], dtype=np.float64)
+                    y_vals = np.asarray(filtered_df[var_y], dtype=np.float64)
+                    z_vals = np.asarray(filtered_df[prediction_col], dtype=np.float64)
+
+                    unique_x = np.unique(x_vals)
+                    unique_y = np.unique(y_vals)
+                    try:
+                        z_grid = z_vals.reshape(len(unique_x), len(unique_y)).T
+                    except ValueError:
+                        pivot_df = filtered_df.pivot_table(
+                            index=var_y, columns=var_x, values=prediction_col
+                        )
+                        z_grid = pivot_df.values
+                        unique_x = pivot_df.columns.values
+                        unique_y = pivot_df.index.values
+
+                    z_min, z_max = prediction_col_ranges.get(
+                        prediction_col, (np.nanmin(z_grid), np.nanmax(z_grid))
+                    )
+
+                    x_label = (
+                        investigation_space_renames.get(var_x, var_x)
+                        if investigation_space_renames
+                        else var_x
+                    )
+                    y_label = (
+                        investigation_space_renames.get(var_y, var_y)
+                        if investigation_space_renames
+                        else var_y
+                    )
+                    z_label = (
+                        measurement_renames.get(prediction_col, prediction_col)
+                        if measurement_renames
+                        else prediction_col
+                    )
+
+                    fig.add_trace(
+                        go.Contour(
+                            z=z_grid,
+                            x=unique_x,
+                            y=unique_y,
+                            colorscale="Viridis",
+                            showscale=show_colorbar,
+                            zmin=z_min,
+                            zmax=z_max,
+                            colorbar=dict(title=""),
+                            contours=dict(showlabels=True, labelfont=dict(size=8)),
+                            hovertemplate=(
+                                f"<b>{x_label}</b>: %{{x:.4f}}<br>"
+                                f"<b>{y_label}</b>: %{{y:.4f}}<br>"
+                                f"<b>{z_label}</b>: %{{z:.4f}}<extra></extra>"
+                            ),
+                            name="GP Prediction",
+                            showlegend=True,
+                        ),
+                        row=1,
+                        col=col,
+                    )
+
+                    if (
+                        not experiments_df.empty
+                        and var_x in experiments_df.columns
+                        and var_y in experiments_df.columns
+                    ):
+                        objective_cols = [
+                            col
+                            for col in experiments_df.columns
+                            if col.startswith("obj:")
+                        ]
+
+                        inside_bounds_indices = []
+                        outside_bounds_indices = []
+
+                        for idx in experiments_df.index:
+                            is_outside_bounds = False
+                            if (
+                                objectives_bounds
+                                and isinstance(objectives_bounds, dict)
+                                and objective_cols
+                            ):
+                                for obj_col in objective_cols:
+                                    if (
+                                        obj_col in objectives_bounds
+                                        and obj_col in experiments_df.columns
+                                    ):
+                                        bounds = objectives_bounds[obj_col]
+                                        value = experiments_df.loc[idx, obj_col]
+                                        try:
+                                            min_val = bounds.get("min")
+                                            max_val = bounds.get("max")
+                                            min_bound = (
+                                                float(min_val)
+                                                if min_val is not None
+                                                else None
+                                            )
+                                            max_bound = (
+                                                float(max_val)
+                                                if max_val is not None
+                                                else None
+                                            )
+                                            if isinstance(value, complex):
+                                                continue
+                                            value_float = float(value)
+                                        except (ValueError, TypeError):
+                                            continue
+
+                                        if (
+                                            min_bound is not None
+                                            and value_float < min_bound
+                                        ):
+                                            is_outside_bounds = True
+                                            break
+                                        if (
+                                            max_bound is not None
+                                            and value_float > max_bound
+                                        ):
+                                            is_outside_bounds = True
+                                            break
+
+                            if is_outside_bounds:
+                                outside_bounds_indices.append(idx)
+                            else:
+                                inside_bounds_indices.append(idx)
+
+                        if inside_bounds_indices:
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=experiments_df.loc[inside_bounds_indices, var_x],
+                                    y=experiments_df.loc[inside_bounds_indices, var_y],
+                                    mode="markers",
+                                    marker=dict(
+                                        size=10,
+                                        symbol="square",
+                                        color=MARKER_COLORS["experiment"],
+                                        line=dict(width=1, color="black"),
+                                    ),
+                                    showlegend=False,
+                                    hoverinfo="skip",
+                                ),
+                                row=1,
+                                col=col,
+                            )
+
+                        if outside_bounds_indices:
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=experiments_df.loc[outside_bounds_indices, var_x],
+                                    y=experiments_df.loc[outside_bounds_indices, var_y],
+                                    mode="markers",
+                                    marker=dict(
+                                        size=10,
+                                        symbol="x",
+                                        color=MARKER_COLORS["discarded"],
+                                        line=dict(width=1, color="black"),
+                                    ),
+                                    showlegend=False,
+                                    hoverinfo="skip",
+                                ),
+                                row=1,
+                                col=col,
+                            )
+
+                    fig.update_xaxes(
+                        title_text=x_label,
+                        row=1,
+                        col=col,
+                        range=[x_min, x_max],
+                    )
+                    fig.update_yaxes(
+                        title_text=y_label,
+                        row=1,
+                        col=col,
+                        range=[y_min, y_max],
+                    )
+                except Exception as e:
+                    print(f"Error processing pair {var_x} vs {var_y}: {e}")
+                    continue
+
+            pred_label = (
+                prediction_col
+                if not measurement_renames
+                else measurement_renames.get(prediction_col, prediction_col)
+            )
+            fig.update_layout(
+                height=500,
+                showlegend=True,
+                hovermode="closest",
+                title_text=f"GP Prediction: {pred_label}",
+                legend=dict(
+                    orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.2
+                ),
+            )
+            figures.append(fig.to_dict())
+
+        return figures
+    except Exception as e:
+        print(f"Error storing GP prediction figures: {e}")
+        return []
+
