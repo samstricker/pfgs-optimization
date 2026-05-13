@@ -3,12 +3,14 @@
 __all__ = [
     "update_pareto_front_plots",
     "update_pareto_details_table",
+    "update_pareto_front_parcoords",
 ]
 
 from pathlib import Path
 from typing import Any
 import traceback
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from dash import ALL, Input, Output, callback_context, html
@@ -474,3 +476,160 @@ def update_pareto_details_table(
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         return html.Div(f"Error loading pareto details: {str(e)}"), pinned_data
+
+
+@app.callback(
+    Output("pareto-front-parcoords-graph", "figure"),
+    Input("mlflow-run", "value"),
+    Input("iteration", "value"),
+    Input("clicked-points-store", "data"),
+    Input("pinned-points-store", "data"),
+    Input("objective-renames-store", "data"),
+    Input("investigation-space-renames-store", "data"),
+    Input("measurement-renames-store", "data"),
+    prevent_initial_call=True,
+)
+def update_pareto_front_parcoords(
+    mlflow_run: str | None,
+    iteration: str | None,
+    clicked_points: ClickedPointsData,
+    pinned_points: dict[str, bool],
+    objective_renames: dict[str, str],
+    investigation_space_renames: dict[str, str],
+    measurement_renames: RenamesDict,
+) -> go.Figure:
+    """Create a parallel coordinates plot for Pareto front showing all columns."""
+    if mlflow_run is None or iteration is None:
+        fig = go.Figure()
+        fig.update_layout(template=get_theme())
+        return fig
+
+    try:
+        # Load Pareto front data
+        pareto_csv = (
+            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+        )
+        pareto_df = pd.read_csv(pareto_csv)
+
+        # Load OptimizationProblem to get actual objective names
+        opt_prob_path = Path(
+            f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/optimization_problem.json"
+        )
+        optimization_problem_data = OptimizationProblem.from_json(opt_prob_path)
+
+        # Create mapping from objective index to objective var_name
+        objective_names_map = {}
+        for idx, axis in enumerate(optimization_problem_data.problem):
+            objective_names_map[idx] = axis.var_name
+
+        # Select all numeric columns
+        numeric_cols = pareto_df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        if not numeric_cols:
+            fig = go.Figure()
+            fig.update_layout(template=get_theme())
+            fig.add_annotation(text="No numeric columns to display")
+            return fig
+
+        # Get selected/clicked indices
+        clicked_indices = []
+        if (
+            clicked_points
+            and isinstance(clicked_points, dict)
+            and "pareto-front" in clicked_points
+        ):
+            clicked_indices = clicked_points["pareto-front"]
+            if not isinstance(clicked_indices, list):
+                clicked_indices = list(clicked_indices) if clicked_indices else []
+            clicked_indices = [int(x) for x in clicked_indices if x is not None]
+
+        # Get pinned indices
+        pinned_indices = []
+        if pinned_points and isinstance(pinned_points, dict):
+            pinned_indices = [int(k) for k, v in pinned_points.items() if v]
+
+        # Create dimensions for parallel coordinates plot
+        dimensions = []
+        for col in numeric_cols:
+            # Determine the display name based on column type
+            label = col
+            
+            # For objectives (obj:X columns)
+            if col.startswith("obj:"):
+                objective_columns = [c for c in numeric_cols if c.startswith("obj:")]
+                col_idx = objective_columns.index(col)
+                obj_display = objective_names_map.get(col_idx, col.replace("obj:", ""))
+                if objective_renames and isinstance(objective_renames, dict):
+                    obj_display = objective_renames.get(str(col_idx), obj_display)
+                label = obj_display
+            # For investigation space variables
+            elif investigation_space_renames and isinstance(investigation_space_renames, dict):
+                label = investigation_space_renames.get(col, col)
+            # For measurements
+            elif measurement_renames and isinstance(measurement_renames, dict):
+                label = measurement_renames.get(col, col)
+            
+            try:
+                min_val = pareto_df[col].min()
+                max_val = pareto_df[col].max()
+                dimensions.append(
+                    dict(
+                        label=label,
+                        values=pareto_df[col],
+                        range=[float(min_val), float(max_val)],
+                    )
+                )
+            except (ValueError, TypeError):
+                # Skip columns that can't be converted to numeric
+                continue
+
+        if not dimensions:
+            fig = go.Figure()
+            fig.update_layout(template=get_theme())
+            fig.add_annotation(text="No valid numeric columns to display")
+            return fig
+
+        # Create color array for selected vs non-selected points
+        colors = []
+        for idx in range(len(pareto_df)):
+            if idx in pinned_indices or idx in clicked_indices:
+                colors.append(MARKER_COLORS["selected"])
+            else:
+                colors.append(MARKER_COLORS["pareto"])
+
+        # Create parallel coordinates plot
+        fig = go.Figure(
+            data=go.Parcoords(
+                dimensions=dimensions,
+                line=dict(
+                    color=colors,
+                    colorscale=None,
+                    showscale=False,
+                ),
+                labelangle=-45,
+                labelside="bottom",
+            )
+        )
+
+        fig.update_layout(
+            template=get_theme(),
+            height=700,
+            title="Pareto Front - Parallel Coordinates",
+            font=dict(size=12),
+            margin=dict(b=150),
+        )
+
+        return fig
+
+    except FileNotFoundError as e:
+        fig = go.Figure()
+        fig.update_layout(template=get_theme())
+        fig.add_annotation(text=f"Data not found: {e}")
+        return fig
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        print(f"Error creating pareto front parallel coordinates: {e}")
+        traceback.print_exc()
+        fig = go.Figure()
+        fig.update_layout(template=get_theme())
+        fig.add_annotation(text=f"Error: {e}")
+        return fig

@@ -26,7 +26,8 @@ from ..utils.data_utils import (
     get_variable_pairs,
 )
 from ..theme.plotly_theme import get_theme
-from .pareto_front import update_pareto_front_plots
+from .pareto_front import update_pareto_front_plots, update_pareto_front_parcoords
+from .experiment_results import update_experiment_results_parcoords
 
 __all__ = ["download_current_plots"]
 
@@ -749,6 +750,28 @@ def download_current_plots(
         )
         figures.append(("pareto-front", pareto_figure))
 
+        # Add experiment results parallel coordinates plot
+        exp_parcoords_figure = update_experiment_results_parcoords(
+            mlflow_run,
+            iteration,
+            clicked_points,
+            measurement_renames or {},
+            investigation_space_renames or {},
+        )
+        figures.append(("experiment-results-parcoords", exp_parcoords_figure))
+
+        # Add Pareto front parallel coordinates plot
+        pareto_parcoords_figure = update_pareto_front_parcoords(
+            mlflow_run,
+            iteration,
+            clicked_points,
+            pinned_points or {},
+            objective_renames or {},
+            investigation_space_renames or {},
+            measurement_renames or {},
+        )
+        figures.append(("pareto-front-parcoords", pareto_parcoords_figure))
+
     if not figures:
         return no_update
 
@@ -814,16 +837,20 @@ def download_current_plots(
                 "This archive contains exports of the current dashboard plots and tables.\n\n"
                 "PLOTS:\n"
                 "  - experiment-results-*.png: Experiment results scatter plots\n"
+                "  - experiment-results-parcoords.png: Experiment results parallel coordinates plot\n"
                 "  - gp-predictions-*.png: GP prediction contour plots\n"
-                "  - pareto-front.png: Pareto front scatter plots\n\n"
+                "  - pareto-front.png: Pareto front scatter plots\n"
+                "  - pareto-front-parcoords.png: Pareto front parallel coordinates plot\n\n"
                 if not use_html_fallback
                 else (
                     "This archive contains interactive HTML exports of the current dashboard plots.\n"
                     "Open any .html file in your browser to view and interact with the plot.\n\n"
                     "PLOTS:\n"
                     "  - experiment-results-*.html: Experiment results scatter plots\n"
+                    "  - experiment-results-parcoords.html: Experiment results parallel coordinates plot\n"
                     "  - gp-predictions-*.html: GP prediction contour plots\n"
-                    "  - pareto-front.html: Pareto front scatter plots\n\n"
+                    "  - pareto-front.html: Pareto front scatter plots\n"
+                    "  - pareto-front-parcoords.html: Pareto front parallel coordinates plot\n\n"
                 )
             )
             readme += (

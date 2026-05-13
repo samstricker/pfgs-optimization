@@ -184,6 +184,13 @@ def get_app_layout() -> html.Div:
                 id="experiment-results-container",
                 style={"width": "100%"},
             ),
+            # Experiment Results Parallel Coordinates Section
+            html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
+            html.H2("Experiment Results - Parallel Coordinates"),
+            dcc.Graph(
+                id="experiment-results-parcoords-graph",
+                style={"width": "100%"},
+            ),
             # GP Predictions Section
             html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
             html.H2("GP Predictions"),
@@ -211,6 +218,13 @@ def get_app_layout() -> html.Div:
             ),
             dcc.Graph(
                 id="pareto-front-graph",
+                style={"width": "100%"},
+            ),
+            # Pareto Front Parallel Coordinates Section
+            html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
+            html.H2("Pareto Front - Parallel Coordinates"),
+            dcc.Graph(
+                id="pareto-front-parcoords-graph",
                 style={"width": "100%"},
             ),
             # Selection Controls Section

@@ -1,6 +1,7 @@
 """Callbacks for experiment results visualization."""
 
 from dash import Input, Output, html, dcc
+import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -21,6 +22,7 @@ from ..utils.types_and_constants import ClickedPointsData, RenamesDict
 __all__ = [
     "update_experiment_results",
     "store_experiment_results_figures",
+    "update_experiment_results_parcoords",
 ]
 
 
@@ -298,3 +300,124 @@ def store_experiment_results_figures(
     except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error storing experiment figures: {e}")
         return []
+
+
+@app.callback(
+    Output("experiment-results-parcoords-graph", "figure"),
+    Input("mlflow-run", "value"),
+    Input("iteration", "value"),
+    Input("clicked-points-store", "data"),
+    Input("measurement-renames-store", "data"),
+    Input("investigation-space-renames-store", "data"),
+    prevent_initial_call=True,
+)
+def update_experiment_results_parcoords(
+    mlflow_run: str,
+    iteration: str,
+    clicked_points: ClickedPointsData,
+    measurement_renames: RenamesDict,
+    investigation_space_renames: RenamesDict,
+) -> go.Figure:
+    """Create a parallel coordinates plot for experiment results."""
+    if mlflow_run is None or iteration is None:
+        fig = go.Figure()
+        fig.update_layout(template=get_theme())
+        return fig
+
+    try:
+        investigation_space = load_investigation_space(mlflow_run)
+        experiments_df = load_experiments_df(mlflow_run, iteration)
+        
+        variables = investigation_space.variables
+        if len(variables) < 1:
+            fig = go.Figure()
+            fig.update_layout(template=get_theme())
+            fig.add_annotation(text="No variables to display")
+            return fig
+
+        var_names = [v.name for v in variables]
+
+        # Select all numeric columns from the dataframe
+        numeric_cols = experiments_df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        if not numeric_cols:
+            fig = go.Figure()
+            fig.update_layout(template=get_theme())
+            fig.add_annotation(text="No numeric columns to display")
+            return fig
+
+        # Get selected/clicked indices
+        selected_indices = (
+            clicked_points.get("experiment-results", [])
+            if isinstance(clicked_points, dict)
+            else []
+        )
+        selected_indices = [int(x) for x in selected_indices if x is not None]
+
+        # Create dimensions for parallel coordinates plot
+        dimensions = []
+        for col in numeric_cols:
+            label = get_display_name(col, investigation_space_renames or measurement_renames)
+            try:
+                min_val = experiments_df[col].min()
+                max_val = experiments_df[col].max()
+                dimensions.append(
+                    dict(
+                        label=label,
+                        values=experiments_df[col],
+                        range=[float(min_val), float(max_val)],
+                    )
+                )
+            except (ValueError, TypeError):
+                # Skip columns that can't be converted to numeric
+                continue
+
+        if not dimensions:
+            fig = go.Figure()
+            fig.update_layout(template=get_theme())
+            fig.add_annotation(text="No valid numeric columns to display")
+            return fig
+
+        # Create color array for selected vs non-selected points
+        colors = []
+        for idx in range(len(experiments_df)):
+            if idx in selected_indices:
+                colors.append(MARKER_COLORS["highlight"])
+            else:
+                colors.append(MARKER_COLORS["pareto"])
+
+        # Create parallel coordinates plot
+        fig = go.Figure(
+            data=go.Parcoords(
+                dimensions=dimensions,
+                line=dict(
+                    color=colors,
+                    colorscale=None,
+                    showscale=False,
+                ),
+                labelangle=-45,
+                labelside="bottom",
+            )
+        )
+
+        fig.update_layout(
+            template=get_theme(),
+            height=700,
+            title="Experiment Results - Parallel Coordinates",
+            font=dict(size=12),
+            margin=dict(b=150),
+        )
+
+        return fig
+
+    except FileNotFoundError as e:
+        fig = go.Figure()
+        fig.update_layout(template=get_theme())
+        fig.add_annotation(text=f"Data not found: {e}")
+        return fig
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        print(f"Error creating experiment results parallel coordinates: {e}")
+        fig = go.Figure()
+        fig.update_layout(template=get_theme())
+        fig.add_annotation(text=f"Error: {e}")
+        return fig
