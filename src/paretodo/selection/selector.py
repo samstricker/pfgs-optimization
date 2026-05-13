@@ -166,6 +166,8 @@ class ParetoSelector:
                         )
                         min_distances = np.minimum(min_distances, distances_to_exp)
 
+            if len(min_distances) == 0:
+                break
             next_idx = np.argmax(min_distances)
 
             # Get original row from pareto_front

@@ -38,7 +38,7 @@ class BaseProblem(Problem):
             n_var=investigation_space.n_var,
             n_obj=optimization_problem.n_obj,
             n_constr=0,
-            xl=[-1.0] * investigation_space.n_var,
+            xl=[0.0] * investigation_space.n_var,
             xu=[1.0] * investigation_space.n_var,
             elementwise=False,
         )

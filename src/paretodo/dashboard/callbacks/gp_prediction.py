@@ -234,10 +234,8 @@ def update_gp_predictions(
                     # Get unique sorted values
                     unique_x = np.unique(x_vals)
                     unique_y = np.unique(y_vals)
-
-                    # Reshape z values into a 2D grid
                     try:
-                        z_grid = z_vals.reshape(len(unique_y), len(unique_x))
+                        z_grid = z_vals.reshape(len(unique_x), len(unique_y)).T
                     except ValueError:
                         # If reshape fails, try pivot table
                         pivot_df = filtered_df.pivot_table(
