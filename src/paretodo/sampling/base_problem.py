@@ -31,6 +31,7 @@ class BaseProblem(Problem):
         self,
         investigation_space: InvestigationSpace,
         optimization_problem: OptimizationProblem,
+        samples_per_dimension: int = 10,
     ):
         self.investigation_space = investigation_space
         self.optimization_problem = optimization_problem
@@ -43,6 +44,7 @@ class BaseProblem(Problem):
             elementwise=False,
         )
         self.best_values: Dict[str, float] = {}
+        self.samples_per_dimension = samples_per_dimension
 
     def set_best_values(self, best_values: Dict[str, float]) -> None:
         """Set the best values for the optimization axes."""
@@ -64,7 +66,9 @@ class BaseProblem(Problem):
         out["F"] = objective_list
 
     @abstractmethod
-    def predict(self, x: NDArray[np.float64]) -> Tuple[Any, pl.DataFrame]:
+    def predict(
+        self, x: NDArray[np.float64], normalized: bool = True
+    ) -> Tuple[Any, pl.DataFrame]:
         """Predict outcomes for given decision variables."""
         raise NotImplementedError("predict method needs to be implemented by child.")
 
@@ -74,55 +78,33 @@ class BaseProblem(Problem):
         raise NotImplementedError("This method should be implemented in subclasses.")
 
     @abstractmethod
-    def _predict_for_pso(self, objective: OptimizationAxis) -> Callable:
-        """Predict the objective value for PSO optimization."""
+    def prediction_to_robust_objective_values(
+        self, predictions, opt_axis: OptimizationAxis
+    ) -> NDArray[np.float64]:
+        """Convert predictions to objective values for a given optimization axis."""
         raise NotImplementedError("This method should be implemented in subclasses.")
 
-    def get_robust_objective_value(
+    def _sample_robust_objective_value(
         self, generation: NDArray[np.float64], objective: OptimizationAxis
-    ) -> NDArray[np.float64]:
-        """Calculate robust objective values accounting for variable uncertainties.
-
-        Parameters
-        ----------
-        generation : NDArray[np.float64]
-            Array of decision variable points.
-        objective : OptimizationAxis
-            The optimization objective to evaluate.
-
-        Returns
-        -------
-        NDArray[np.float64]
-            Robust objective values for the generation.
-        """
-        expected_errors = self.investigation_space.expected_errors
-        if any(error is None for error in expected_errors):
-            raise ValueError(
-                "Expected errors must be set for all variables to calculate robust objective value."
+    ):
+        dim = len(self.investigation_space.variables)
+        n_samples = self.samples_per_dimension * dim
+        obj = []
+        for value in generation:
+            robust_recipes = np.empty((n_samples, dim))
+            for i, var in enumerate(self.investigation_space.variables):
+                var_samples = np.random.normal(
+                    loc=0.0,
+                    scale=np.array([var.expected_error]),
+                    size=n_samples,
+                )
+                robust_recipes[:, i] = var_samples + value[i]
+            predictions, _ = self.predict(robust_recipes, normalized=False)
+            objective_values = self.prediction_to_robust_objective_values(
+                predictions, objective
             )
-        values = []
-        for point in generation:
-            lower_bounds = point - np.array(expected_errors)
-            upper_bounds = point + np.array(expected_errors)
-            bounds = (lower_bounds, upper_bounds)
-            options = {"c1": 0.5, "c2": 0.3, "w": 0.9}
-            n_particles = 20
-            n_iters = 100
-
-            optimizer = ps.single.GlobalBestPSO(
-                n_particles=n_particles,
-                dimensions=len(self.investigation_space.variables),
-                options=options,
-                bounds=bounds,
-            )
-            pso_function = self._predict_for_pso(objective)
-            best_val, _ = optimizer.optimize(
-                objective_func=pso_function,
-                iters=n_iters,
-                verbose=False,
-            )
-            values.append(best_val)
-        return np.array(values)
+            obj.append(np.mean(objective_values))
+        return np.array(obj)
 
     def _get_objective_value(
         self,
@@ -135,7 +117,7 @@ class BaseProblem(Problem):
         if optim_axis.optimization_type == "objective":
             obj = mean
         elif optim_axis.optimization_type == "robustness":
-            obj = self.get_robust_objective_value(
+            obj = self._sample_robust_objective_value(
                 generation=x_vals, objective=optim_axis
             )
         elif optim_axis.optimization_type == "expected_improvement":
