@@ -57,6 +57,11 @@ def get_app_layout() -> html.Div:
                 id="gp-predictions-figures-store",
                 data=[],
             ),
+            # Store for alternative expected error values
+            dcc.Store(
+                id="alternative-expected-error-store",
+                data={},
+            ),
             # Download component for exporting plots and tables
             dcc.Download(id="download-plots-tables"),
             html.H1("Pareto Front Visualization (Version 2)"),
@@ -196,6 +201,65 @@ def get_app_layout() -> html.Div:
             html.H2("GP Predictions"),
             html.Div(
                 id="gp-filters-container",
+                style={"marginBottom": "20px"},
+            ),
+            # Robustness Section
+            html.Div(
+                [
+                    html.H3("Robustness", style={"marginBottom": "15px"}),
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Confidence Level (%):",
+                                        style={
+                                            "marginRight": "10px",
+                                            "fontWeight": "bold",
+                                        },
+                                    ),
+                                    dcc.Dropdown(
+                                        id="robustness-confidence-level",
+                                        options=[
+                                            {"label": f"{val}%", "value": val}
+                                            for val in [25, 50, 75, 80, 85, 90, 95, 99]
+                                        ],
+                                        value=95,
+                                        style={"width": "150px"},
+                                    ),
+                                ],
+                                style={
+                                    "display": "inline-block",
+                                    "marginRight": "30px",
+                                },
+                            ),
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Pareto Point:",
+                                        style={
+                                            "marginRight": "10px",
+                                            "fontWeight": "bold",
+                                        },
+                                    ),
+                                    dcc.Dropdown(
+                                        id="robustness-pareto-point",
+                                        options=[],
+                                        value=None,
+                                        style={"width": "250px"},
+                                    ),
+                                ],
+                                style={"display": "inline-block"},
+                            ),
+                        ],
+                        style={
+                            "padding": "10px",
+                            "backgroundColor": "#f5f5f5",
+                            "borderRadius": "5px",
+                            "marginBottom": "15px",
+                        },
+                    ),
+                ],
                 style={"marginBottom": "20px"},
             ),
             html.Div(

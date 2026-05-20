@@ -12,6 +12,7 @@ __all__ = [
     "update_objective_renames",
     "update_investigation_space_renames",
     "update_measurement_renames",
+    "update_alternative_expected_errors",
 ]
 
 
@@ -168,3 +169,34 @@ def update_measurement_renames(
             renames_data[measurement_name] = rename_val.strip()
 
     return renames_data
+
+
+@app.callback(
+    Output("alternative-expected-error-store", "data"),
+    Input({"type": "alternative-expected-error-input", "index": ALL}, "value"),
+    State({"type": "alternative-expected-error-input", "index": ALL}, "id"),
+    Input("mlflow-run", "value"),
+)
+def update_alternative_expected_errors(
+    error_values: list[str],
+    error_ids: list[dict],
+    _mlflow_run: str,
+) -> dict:
+    """Store alternative expected error values or reset on new run."""
+    ctx = callback_context
+
+    if ctx.triggered and any("mlflow-run" in str(t["prop_id"]) for t in ctx.triggered):
+        return {}
+
+    errors_data = {}
+    for i, error_id in enumerate(error_ids):
+        var_name = error_id["index"]
+        error_val = error_values[i] if i < len(error_values) else ""
+
+        if error_val and error_val.strip():
+            try:
+                errors_data[var_name] = float(error_val.strip())
+            except ValueError:
+                pass  # Ignore invalid numeric values
+
+    return errors_data

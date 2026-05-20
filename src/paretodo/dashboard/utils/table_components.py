@@ -84,6 +84,7 @@ def create_investigation_space_table(
                 "Max",
                 "Discretization",
                 "Expected Error",
+                "Alternative Expected Error",
             ]
         )
     ]
@@ -114,6 +115,15 @@ def create_investigation_space_table(
                     create_table_cell(str(var.max), idx),
                     create_table_cell(discretization, idx),
                     create_table_cell(expected_error, idx),
+                    create_table_cell(
+                        "",
+                        idx,
+                        is_input=True,
+                        input_id={
+                            "type": "alternative-expected-error-input",
+                            "index": var.name,
+                        },
+                    ),
                 ]
             )
         )

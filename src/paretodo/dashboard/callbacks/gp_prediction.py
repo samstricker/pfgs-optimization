@@ -2,6 +2,7 @@
 
 __all__ = [
     "populate_gp_filters",
+    "populate_robustness_pareto_points",
     "update_gp_predictions",
     "store_gp_predictions_figures",
 ]
@@ -101,6 +102,55 @@ def populate_gp_filters(
 
 
 @app.callback(
+    Output("robustness-pareto-point", "options"),
+    Input("mlflow-run", "value"),
+    Input("iteration", "value"),
+    prevent_initial_call=True,
+)
+def populate_robustness_pareto_points(
+    mlflow_run: str | None,
+    iteration: str | None,
+) -> list[dict]:
+    """Populate pareto points dropdown for robustness analysis."""
+    if mlflow_run is None or iteration is None:
+        return []
+
+    try:
+        # Load pareto front predictions
+        pareto_csv = (
+            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+        )
+        pareto_df = pd.read_csv(pareto_csv)
+
+        if pareto_df.empty:
+            return []
+
+        # Load investigation space to get variable names for display
+        investigation_space = InvestigationSpace.from_json(
+            Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/investigation_space.json")
+        )
+        var_names = [v.name for v in investigation_space.variables]
+
+        # Create options with point index and variable values
+        options = []
+        for idx, row in pareto_df.iterrows():
+            # Get variable values for this point
+            var_values = []
+            for var_name in var_names:
+                if var_name in row:
+                    var_values.append(f"{var_name}={row[var_name]:.4g}")
+
+            var_str = ", ".join(var_values)
+            label = f"Point {idx}: {var_str}"
+            options.append({"label": label, "value": int(idx)})
+
+        return options
+
+    except (FileNotFoundError, KeyError, ValueError, TypeError):
+        return []
+
+
+@app.callback(
     Output("gp-predictions-container", "children"),
     Input("mlflow-run", "value"),
     Input("iteration", "value"),
@@ -110,6 +160,9 @@ def populate_gp_filters(
     Input("measurement-renames-store", "data"),
     Input("investigation-space-renames-store", "data"),
     Input("objectives-bounds-store", "data"),
+    Input("robustness-confidence-level", "value"),
+    Input("robustness-pareto-point", "value"),
+    Input("alternative-expected-error-store", "data"),
     prevent_initial_call=True,
 )
 def update_gp_predictions(
@@ -121,10 +174,16 @@ def update_gp_predictions(
     measurement_renames: dict[str, str],
     investigation_space_renames: dict[str, str],
     objectives_bounds: dict | None,
+    robustness_confidence_level: int | None,
+    robustness_pareto_point: int | None,
+    alternative_expected_errors: dict[str, float] | None,
 ) -> list[html.Div]:
     """Create contour plots for each GP prediction using variable pair layout."""
     if mlflow_run is None or iteration is None:
         return [html.Div("No data selected")]
+
+    if alternative_expected_errors is None:
+        alternative_expected_errors = {}
 
     try:
         # Load investigation space to get variable names
@@ -717,6 +776,151 @@ def update_gp_predictions(
                             col=col,
                         )
 
+                    # Add robustness confidence box for selected pareto point
+                    if (
+                        robustness_pareto_point is not None
+                        and robustness_confidence_level is not None
+                        and not pareto_df.empty
+                        and robustness_pareto_point < len(pareto_df)
+                        and var_x in pareto_df.columns
+                        and var_y in pareto_df.columns
+                    ):
+                        try:
+                            # Get the selected pareto point coordinates
+                            pareto_point = pareto_df.iloc[robustness_pareto_point]
+                            point_x = pareto_point[var_x]
+                            point_y = pareto_point[var_y]
+
+                            # Calculate confidence factor based on confidence level
+                            # Using a simple mapping: confidence% -> z-score
+                            confidence_factors = {
+                                25: 0.319,
+                                50: 0.674,
+                                75: 1.150,
+                                80: 1.282,
+                                85: 1.440,
+                                90: 1.645,
+                                95: 1.960,
+                                99: 2.576,
+                            }
+                            z_score = confidence_factors.get(
+                                robustness_confidence_level, 1.960
+                            )
+
+                            # Find the expected error for each variable
+                            x_error = None
+                            y_error = None
+                            for var in variables:
+                                if var.name == var_x and var.expected_error is not None:
+                                    x_error = var.expected_error
+                                elif (
+                                    var.name == var_y and var.expected_error is not None
+                                ):
+                                    y_error = var.expected_error
+
+                            # Calculate confidence intervals
+                            if x_error is not None and y_error is not None:
+                                x_interval = z_score * x_error
+                                y_interval = z_score * y_error
+
+                                # Define the rectangle corners
+                                rect_x = [
+                                    point_x - x_interval,
+                                    point_x + x_interval,
+                                    point_x + x_interval,
+                                    point_x - x_interval,
+                                    point_x - x_interval,
+                                ]
+                                rect_y = [
+                                    point_y - y_interval,
+                                    point_y - y_interval,
+                                    point_y + y_interval,
+                                    point_y + y_interval,
+                                    point_y - y_interval,
+                                ]
+
+                                # Add the red dashed rectangle
+                                fig.add_trace(
+                                    go.Scatter(
+                                        x=rect_x,
+                                        y=rect_y,
+                                        mode="lines",
+                                        line=dict(
+                                            color="red",
+                                            width=2,
+                                            dash="dash",
+                                        ),
+                                        hovertemplate="<b>Confidence Box</b><br>"
+                                        f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
+                                        name=f"Confidence Box ({robustness_confidence_level}%)",
+                                        showlegend=True,
+                                        fill="toself",
+                                        fillcolor="rgba(255,0,0,0.05)",
+                                    ),
+                                    row=1,
+                                    col=col,
+                                )
+
+                                # Add green box for alternative expected errors if provided
+                                if alternative_expected_errors and (
+                                    var_x in alternative_expected_errors
+                                    or var_y in alternative_expected_errors
+                                ):
+                                    # Use alternative error if provided, otherwise use original
+                                    alt_x_error = alternative_expected_errors.get(
+                                        var_x, x_error
+                                    )
+                                    alt_y_error = alternative_expected_errors.get(
+                                        var_y, y_error
+                                    )
+
+                                    if (
+                                        alt_x_error is not None
+                                        and alt_y_error is not None
+                                    ):
+                                        alt_x_interval = z_score * alt_x_error
+                                        alt_y_interval = z_score * alt_y_error
+
+                                        # Define the green rectangle corners
+                                        alt_rect_x = [
+                                            point_x - alt_x_interval,
+                                            point_x + alt_x_interval,
+                                            point_x + alt_x_interval,
+                                            point_x - alt_x_interval,
+                                            point_x - alt_x_interval,
+                                        ]
+                                        alt_rect_y = [
+                                            point_y - alt_y_interval,
+                                            point_y - alt_y_interval,
+                                            point_y + alt_y_interval,
+                                            point_y + alt_y_interval,
+                                            point_y - alt_y_interval,
+                                        ]
+
+                                        # Add the green dashed rectangle
+                                        fig.add_trace(
+                                            go.Scatter(
+                                                x=alt_rect_x,
+                                                y=alt_rect_y,
+                                                mode="lines",
+                                                line=dict(
+                                                    color="purple",
+                                                    width=2,
+                                                    dash="dash",
+                                                ),
+                                                hovertemplate="<b>Alternative Confidence Box</b><br>"
+                                                f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
+                                                name=f"Alternative Box ({robustness_confidence_level}%)",
+                                                showlegend=True,
+                                                fill="toself",
+                                                fillcolor="rgba(0,255,0,0.05)",
+                                            ),
+                                            row=1,
+                                            col=col,
+                                        )
+                        except (KeyError, AttributeError, ValueError):
+                            pass
+
                 except ValueError:
                     continue
 
@@ -824,7 +1028,9 @@ def store_gp_predictions_figures(
         investigation_space = InvestigationSpace.from_json(
             Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/investigation_space.json")
         )
-        meshgrid_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/meshgrid_predictions.csv"
+        meshgrid_csv = (
+            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/meshgrid_predictions.csv"
+        )
         meshgrid_df = pd.read_csv(meshgrid_csv)
 
         experiments_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/experiments.csv"
@@ -833,7 +1039,9 @@ def store_gp_predictions_figures(
         except FileNotFoundError:
             experiments_df = pd.DataFrame()
 
-        pareto_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+        pareto_csv = (
+            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+        )
         try:
             pareto_df = pd.read_csv(pareto_csv)
         except FileNotFoundError:
@@ -1058,6 +1266,12 @@ def store_gp_predictions_figures(
                                 col=col,
                             )
 
+                    # Get bounds from pair_variables
+                    x_min = pair_variables[col_idx][0].min
+                    x_max = pair_variables[col_idx][0].max
+                    y_min = pair_variables[col_idx][1].min
+                    y_max = pair_variables[col_idx][1].max
+
                     fig.update_xaxes(
                         title_text=x_label,
                         row=1,
@@ -1094,4 +1308,3 @@ def store_gp_predictions_figures(
     except Exception as e:
         print(f"Error storing GP prediction figures: {e}")
         return []
-
