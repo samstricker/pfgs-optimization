@@ -280,17 +280,6 @@ def get_app_layout() -> html.Div:
                 id="objectives-table-container",
                 style={"marginBottom": "20px"},
             ),
-            dcc.Graph(
-                id="pareto-front-graph",
-                style={"width": "100%"},
-            ),
-            # Pareto Front Parallel Coordinates Section
-            html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
-            html.H2("Pareto Front - Parallel Coordinates"),
-            dcc.Graph(
-                id="pareto-front-parcoords-graph",
-                style={"width": "100%"},
-            ),
             # Selection Controls Section
             html.Div(
                 [
@@ -358,6 +347,74 @@ def get_app_layout() -> html.Div:
                     ),
                 ],
                 style={"width": "100%"},
+            ),
+            dcc.Graph(
+                id="pareto-front-graph",
+                style={"width": "100%"},
+            ),
+            # Pareto Front Parallel Coordinates Section
+            html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
+            html.H2("Pareto Front - Parallel Coordinates"),
+            dcc.Graph(
+                id="pareto-front-parcoords-graph",
+                style={"width": "100%"},
+            ),
+            # Pareto Parallel Coordinates Controls
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Label(
+                                "Columns to Display:",
+                                style={
+                                    "fontWeight": "bold",
+                                    "marginBottom": "10px",
+                                    "display": "block",
+                                },
+                            ),
+                            dcc.Checklist(
+                                id="parcoords-columns-checklist",
+                                options=[],  # Will be populated by callback
+                                value=[],  # Will be populated by callback
+                                style={
+                                    "display": "flex",
+                                    "flexWrap": "wrap",
+                                    "gap": "15px",
+                                },
+                                labelStyle={"marginRight": "10px"},
+                            ),
+                        ],
+                        style={"marginBottom": "20px"},
+                    ),
+                    html.Div(
+                        [
+                            dcc.Checklist(
+                                id="parcoords-visibility-checklist",
+                                options=[
+                                    {
+                                        "label": " Show Experiments",
+                                        "value": "show_experiments",
+                                    },
+                                    {
+                                        "label": " Show Selected Recipes",
+                                        "value": "show_selected",
+                                    },
+                                ],
+                                value=["show_experiments", "show_selected"],
+                                style={"display": "flex", "gap": "30px"},
+                                labelStyle={"marginRight": "10px"},
+                            ),
+                        ],
+                        style={"marginBottom": "20px"},
+                    ),
+                ],
+                style={
+                    "padding": "15px",
+                    "backgroundColor": "#f8f9fa",
+                    "border": "1px solid #dee2e6",
+                    "borderRadius": "4px",
+                    "marginBottom": "20px",
+                },
             ),
             # Pareto Point Details Section
             html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
