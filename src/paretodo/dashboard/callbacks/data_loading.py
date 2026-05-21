@@ -342,3 +342,40 @@ def update_investigation_optimization_tables(
         ]
     )
     return combined_investigation, optimization_problem
+
+
+@app.callback(
+    Output("clicked-points-store", "data", allow_duplicate=True),
+    Output("pinned-points-store", "data", allow_duplicate=True),
+    Input("iteration", "value"),
+    prevent_initial_call=True,
+)
+def reset_selections_on_iteration_change(iteration):
+    """Reset both manual and automated selections when iteration changes.
+
+    Parameters
+    ----------
+    iteration : str
+        The selected iteration.
+
+    Returns
+    -------
+    tuple
+        Tuple of (reset clicked-points-store, reset pinned-points-store).
+    """
+    if iteration is None:
+        return {
+            "investigation-space": [],
+            "pareto-front": [],
+            "experiment-results": [],
+        }, {}
+
+    # Return reset values for both stores
+    return (
+        {
+            "investigation-space": [],
+            "pareto-front": [],
+            "experiment-results": [],
+        },
+        {},
+    )
