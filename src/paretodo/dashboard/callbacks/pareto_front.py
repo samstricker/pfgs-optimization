@@ -34,6 +34,33 @@ from ..utils.types_and_constants import (
 from ..theme.plotly_theme import get_theme
 
 
+def _extract_name_from_pattern(display_name: str) -> tuple[str | None, str | None]:
+    """Extract prefix and inner name from patterns like 'μ(name)' or 'R(name)'.
+
+    Matches patterns like 'μ(name)', 'R(name)', or 'prefix μ(name)', 'prefix R(name)'.
+    Returns:
+        Tuple of (prefix, inner_name) or (None, None) if pattern doesn't match
+    """
+    # Match patterns like μ(name), R(name), etc. anywhere in the string
+    import re
+
+    match = re.search(r"([μR])\(([^)]+)\)", display_name)
+    if match:
+        return match.group(1), match.group(2)
+    return None, None
+
+
+def _should_add_diagonal_line(x_display: str, y_display: str) -> bool:
+    """Check if x and y axes have same underlying name with different prefixes."""
+    x_prefix, x_name = _extract_name_from_pattern(x_display)
+    y_prefix, y_name = _extract_name_from_pattern(y_display)
+
+    # Return True if both have patterns, have same inner name, and different prefixes
+    if x_name is not None and y_name is not None:
+        return x_name == y_name and x_prefix != y_prefix
+    return False
+
+
 @app.callback(
     Output("pareto-front-graph", "figure"),
     Input("mlflow-run", "value"),
@@ -354,6 +381,33 @@ def update_pareto_front_plots(
 
             fig.update_xaxes(title_text=obj_x_display, row=row, col=col)
             fig.update_yaxes(title_text=obj_y_display, row=row, col=col)
+
+            # Add diagonal X=Y line if x and y represent same variable with different prefixes
+            if _should_add_diagonal_line(obj_x_display, obj_y_display):
+                # Calculate range for diagonal line
+                try:
+                    x_min = pareto_df[obj_x_name].min()
+                    x_max = pareto_df[obj_x_name].max()
+                    y_min = pareto_df[obj_y_name].min()
+                    y_max = pareto_df[obj_y_name].max()
+
+                    # Diagonal line range should be the min/max of both axes
+                    min_val = min(float(x_min), float(y_min))  # type: ignore
+                    max_val = max(float(x_max), float(y_max))  # type: ignore
+
+                    # Add diagonal line as a shape
+                    fig.add_shape(
+                        type="line",
+                        x0=min_val,
+                        y0=min_val,
+                        x1=max_val,
+                        y1=max_val,
+                        line=dict(color="gray", width=2, dash="dot"),
+                        row=row,
+                        col=col,
+                    )
+                except (ValueError, TypeError):
+                    pass  # Skip if calculation fails
 
         fig.update_layout(
             height=400 * rows + 100,
