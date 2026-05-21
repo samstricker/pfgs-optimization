@@ -220,7 +220,9 @@ def _regenerate_gp_predictions_figures(
             Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/investigation_space.json")
         )
 
-        meshgrid_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/meshgrid_predictions.csv"
+        meshgrid_csv = (
+            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/meshgrid_predictions.csv"
+        )
         meshgrid_df = pd.read_csv(meshgrid_csv)
 
         try:
@@ -585,17 +587,19 @@ def _export_investigation_space_csv(
         path = Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/investigation_space.json")
         investigation_space = InvestigationSpace.from_json(path)
         renames = investigation_space_renames or {}
-        
+
         rows = []
         for var in investigation_space.variables:
             display_name = renames.get(var.name, var.name)
-            rows.append({
-                "name": display_name,
-                "min": var.min,
-                "max": var.max,
-                "current": getattr(var, "current", ""),
-            })
-        
+            rows.append(
+                {
+                    "name": display_name,
+                    "min": var.min,
+                    "max": var.max,
+                    "current": getattr(var, "current", ""),
+                }
+            )
+
         df = pd.DataFrame(rows)
         return df.to_csv(index=False)
     except Exception as e:
@@ -611,16 +615,18 @@ def _export_optimization_problem_csv(
         path = Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/optimization_problem.json")
         opt_problem = OptimizationProblem.from_json(path)
         renames = objective_renames or {}
-        
+
         rows = []
         for idx, axis in enumerate(opt_problem.problem):
             display_name = renames.get(str(idx), axis.var_name)
-            rows.append({
-                "objective_index": idx,
-                "variable_name": display_name,
-                "direction": axis.direction,
-            })
-        
+            rows.append(
+                {
+                    "objective_index": idx,
+                    "variable_name": display_name,
+                    "direction": axis.direction,
+                }
+            )
+
         df = pd.DataFrame(rows)
         return df.to_csv(index=False)
     except Exception as e:
@@ -641,17 +647,17 @@ def _export_measurements_csv(
             df = pd.read_csv(path)
             inv_renames = investigation_space_renames or {}
             meas_renames = measurement_renames or {}
-            
+
             rename_map = {}
             for col in df.columns:
                 if col in inv_renames:
                     rename_map[col] = inv_renames[col]
                 elif col in meas_renames:
                     rename_map[col] = meas_renames[col]
-            
+
             if rename_map:
                 df = df.rename(columns=rename_map)
-            
+
             return df.to_csv(index=False)
     except Exception as e:
         print(f"Error exporting measurements: {e}")
@@ -670,15 +676,15 @@ def _export_pareto_front_csv(
         if os.path.exists(path):
             df = pd.read_csv(path)
             meas_renames = measurement_renames or {}
-            
+
             rename_map = {}
             for col in df.columns:
                 if col in meas_renames:
                     rename_map[col] = meas_renames[col]
-            
+
             if rename_map:
                 df = df.rename(columns=rename_map)
-            
+
             return df.to_csv(index=False)
     except Exception as e:
         print(f"Error exporting pareto front: {e}")
@@ -696,6 +702,8 @@ def _export_pareto_front_csv(
     State("objective-renames-store", "data"),
     State("investigation-space-renames-store", "data"),
     State("measurement-renames-store", "data"),
+    State("parcoords-columns-checklist", "value"),
+    State("parcoords-visibility-checklist", "value"),
     prevent_initial_call=True,
 )
 def download_current_plots(
@@ -708,6 +716,8 @@ def download_current_plots(
     objective_renames: dict[str, str],
     investigation_space_renames: dict[str, str],
     measurement_renames: dict[str, str],
+    selected_columns: list[str] | None,
+    visibility_options: list[str] | None,
 ):
     """Download the current figures as a zip archive of PNGs with current state and renames."""
     if n_clicks is None:
@@ -769,6 +779,8 @@ def download_current_plots(
             objective_renames or {},
             investigation_space_renames or {},
             measurement_renames or {},
+            selected_columns or [],
+            visibility_options or [],
         )
         figures.append(("pareto-front-parcoords", pareto_parcoords_figure))
 
@@ -777,10 +789,12 @@ def download_current_plots(
 
     def _write_archive(buffer: BytesIO) -> None:
         use_html_fallback = False
-        with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        with zipfile.ZipFile(
+            buffer, mode="w", compression=zipfile.ZIP_DEFLATED
+        ) as archive:
             for prefix, figure in figures:
                 width, height = _export_dimensions(figure)
-                
+
                 if not use_html_fallback:
                     try:
                         image_bytes = pio.to_image(
@@ -803,20 +817,20 @@ def download_current_plots(
                     figure.update_layout(width=width, height=height)
                     html_str = pio.to_html(figure, include_plotlyjs="cdn")
                     archive.writestr(f"{prefix}.html", html_str)
-            
+
             if mlflow_run is not None:
                 investigation_space_csv = _export_investigation_space_csv(
                     mlflow_run, investigation_space_renames
                 )
                 if investigation_space_csv:
                     archive.writestr("investigation_space.csv", investigation_space_csv)
-                
+
                 opt_problem_csv = _export_optimization_problem_csv(
                     mlflow_run, objective_renames
                 )
                 if opt_problem_csv:
                     archive.writestr("optimization_problem.csv", opt_problem_csv)
-                
+
                 if iteration is not None:
                     measurements_csv = _export_measurements_csv(
                         mlflow_run,
@@ -826,13 +840,13 @@ def download_current_plots(
                     )
                     if measurements_csv:
                         archive.writestr("measurements.csv", measurements_csv)
-                    
+
                     pareto_csv = _export_pareto_front_csv(
                         mlflow_run, iteration, objective_renames, measurement_renames
                     )
                     if pareto_csv:
                         archive.writestr("pareto_front.csv", pareto_csv)
-            
+
             readme = (
                 "This archive contains exports of the current dashboard plots and tables.\n\n"
                 "PLOTS:\n"
