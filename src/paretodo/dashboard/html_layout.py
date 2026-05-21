@@ -128,6 +128,16 @@ def get_app_layout() -> html.Div:
                                         value=None,
                                         style={"width": "100%"},
                                     ),
+                                    html.Button(
+                                        "Refresh Iterations",
+                                        id="refresh-iterations-button",
+                                        n_clicks=0,
+                                        style={
+                                            "width": "100%",
+                                            "marginTop": "5px",
+                                            "padding": "8px",
+                                        },
+                                    ),
                                 ],
                                 style={"marginBottom": "15px"},
                             ),

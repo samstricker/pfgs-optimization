@@ -18,7 +18,7 @@ from . import (
 from .data_loading import (
     update_mlflow_experiments_dropdown,
     update_mlflow_runs_dropdown,
-    update_iteration_dropdown,
+    update_iterations_and_download_artifacts,
     download_json_files,
     update_investigation_optimization_tables,
 )
@@ -38,7 +38,7 @@ __all__.extend(
     [
         "update_mlflow_experiments_dropdown",
         "update_mlflow_runs_dropdown",
-        "update_iteration_dropdown",
+        "update_iterations_and_download_artifacts",
         "download_json_files",
         "update_investigation_optimization_tables",
     ]

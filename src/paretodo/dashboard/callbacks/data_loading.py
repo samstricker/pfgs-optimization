@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from dash import Input, Output, no_update, html
+from dash import Input, Output, html
 import mlflow
 import pandas as pd
 
@@ -57,8 +57,13 @@ def update_mlflow_experiments_dropdown(mlflow_port):
     Input("mlflow-experiment", "value"),
     Input("refresh-runs-button", "n_clicks"),
 )
-def update_mlflow_runs_dropdown(mlflow_port, mlflow_experiment, n_clicks):
-    """Update the MLflow runs dropdown and download artifacts including all iterations.
+def update_mlflow_runs_dropdown(
+    mlflow_port, mlflow_experiment, n_clicks
+):  # pylint: disable=unused-argument
+    """Update the MLflow runs dropdown based on selected experiment.
+
+    This callback only fetches and displays run names without downloading artifacts.
+    The n_clicks parameter serves as a trigger for the refresh button.
 
     Parameters
     ----------
@@ -67,15 +72,15 @@ def update_mlflow_runs_dropdown(mlflow_port, mlflow_experiment, n_clicks):
     mlflow_experiment : str
         The selected experiment name.
     n_clicks : int
-        Number of times the refresh button was clicked.
+        Number of times the refresh button was clicked (trigger parameter).
 
     Returns
     -------
     tuple
         Tuple of (list of run names, reset n_clicks to 0).
     """
-    if n_clicks is None or mlflow_experiment is None:
-        return no_update, no_update
+    if mlflow_experiment is None:
+        return [], 0
 
     try:
         client = mlflow.tracking.MlflowClient(
@@ -85,36 +90,7 @@ def update_mlflow_runs_dropdown(mlflow_port, mlflow_experiment, n_clicks):
             mlflow_experiment
         ).experiment_id
         run_list = client.search_runs(experiment_ids=[mlflow_experiment_id])
-        experiment_list = []
-        for run in run_list:
-            experiment_list.append(run.info.run_name)
-            temp_dir = os.path.join(LOCAL_TEMP_DIR, run.info.run_name)
-            if not os.path.exists(temp_dir):
-                os.makedirs(temp_dir)
-            try:
-                # Download general artifacts
-                client.download_artifacts(
-                    run_id=run.info.run_id,
-                    path="general",
-                    dst_path=temp_dir,
-                )
-                # Discover and download all available iterations
-                try:
-                    artifacts = client.list_artifacts(run_id=run.info.run_id)
-                    for artifact in artifacts:
-                        # Check if this is a directory (iteration folders are directories)
-                        if artifact.is_dir and artifact.path.startswith("Iteration_"):
-                            client.download_artifacts(
-                                run_id=run.info.run_id,
-                                path=artifact.path,
-                                dst_path=temp_dir,
-                            )
-                except (mlflow.exceptions.MlflowException, OSError) as e:
-                    print(
-                        f"Error discovering iterations for run {run.info.run_id}: {e}"
-                    )
-            except (mlflow.exceptions.MlflowException, OSError) as e:
-                print(f"Error downloading artifacts for run {run.info.run_id}: {e}")
+        experiment_list = [run.info.run_name for run in run_list]
         return experiment_list, 0
     except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error fetching runs: {e}")
@@ -127,9 +103,18 @@ def update_mlflow_runs_dropdown(mlflow_port, mlflow_experiment, n_clicks):
     Input("mlflow-port", "value"),
     Input("mlflow-experiment", "value"),
     Input("mlflow-run", "value"),
+    Input("refresh-iterations-button", "n_clicks"),
 )
-def update_iteration_dropdown(mlflow_port, mlflow_experiment, mlflow_run):
-    """Update the iteration dropdown based on available iterations.
+def update_iterations_and_download_artifacts(
+    mlflow_port, mlflow_experiment, mlflow_run, refresh_clicks
+):  # pylint: disable=unused-argument
+    """Update iteration dropdown and download selected run artifacts.
+
+    This callback handles two scenarios:
+    1. When a run is selected: downloads artifacts and updates iterations
+    2. When refresh button is clicked: re-downloads artifacts and updates iterations
+
+    The refresh_clicks parameter serves as a trigger for the refresh button.
 
     Parameters
     ----------
@@ -139,6 +124,8 @@ def update_iteration_dropdown(mlflow_port, mlflow_experiment, mlflow_run):
         The selected experiment name.
     mlflow_run : str
         The selected run name.
+    refresh_clicks : int
+        Number of times the refresh button was clicked (trigger parameter).
 
     Returns
     -------
@@ -146,16 +133,63 @@ def update_iteration_dropdown(mlflow_port, mlflow_experiment, mlflow_run):
         Tuple of (list of iteration options, default iteration value).
     """
     if mlflow_experiment is None or mlflow_run is None:
-        return no_update, no_update
+        return [], None
 
     try:
-        _, run = get_client_and_run(mlflow_port, mlflow_experiment, mlflow_run)
-        if run is None:
+        client = mlflow.tracking.MlflowClient(
+            tracking_uri=f"http://127.0.0.1:{mlflow_port}"
+        )
+        mlflow_experiment_id = client.get_experiment_by_name(
+            mlflow_experiment
+        ).experiment_id
+        run_list = client.search_runs(experiment_ids=[mlflow_experiment_id])
+
+        # Find the selected run
+        selected_run = None
+        for run in run_list:
+            if run.info.run_name == mlflow_run:
+                selected_run = run
+                break
+
+        if selected_run is None:
             return [], None
-        temp_dir = os.path.join(LOCAL_TEMP_DIR, run.info.run_name)
+
+        # Create temp directory and download artifacts for selected run only
+        temp_dir = os.path.join(LOCAL_TEMP_DIR, selected_run.info.run_name)
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+
+        try:
+            # Download general artifacts
+            client.download_artifacts(
+                run_id=selected_run.info.run_id,
+                path="general",
+                dst_path=temp_dir,
+            )
+            # Discover and download all available iterations
+            try:
+                artifacts = client.list_artifacts(run_id=selected_run.info.run_id)
+                for artifact in artifacts:
+                    # Check if this is a directory (iteration folders are directories)
+                    if artifact.is_dir and artifact.path.startswith("Iteration_"):
+                        client.download_artifacts(
+                            run_id=selected_run.info.run_id,
+                            path=artifact.path,
+                            dst_path=temp_dir,
+                        )
+            except (mlflow.exceptions.MlflowException, OSError) as e:
+                print(
+                    f"Error discovering iterations for run {selected_run.info.run_id}: {e}"
+                )
+        except (mlflow.exceptions.MlflowException, OSError) as e:
+            print(
+                f"Error downloading artifacts for run {selected_run.info.run_id}: {e}"
+            )
+
+        # Get available iterations from downloaded artifacts
         if not os.path.exists(temp_dir):
             return [], None
-        # Only show directories that start with "Iteration_"
+
         options = [
             option.name
             for option in Path(temp_dir).iterdir()
@@ -166,7 +200,7 @@ def update_iteration_dropdown(mlflow_port, mlflow_experiment, mlflow_run):
         options.sort()
         return options, options[0] if len(options) > 0 else None
     except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error fetching iterations: {e}")
+        print(f"Error updating iterations: {e}")
         return [], None
 
 
