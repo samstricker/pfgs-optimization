@@ -67,6 +67,17 @@ def get_app_layout() -> html.Div:
                 id="pareto-mode-store",
                 data="Optimization",
             ),
+            # Store for viewport width so plots can adapt to screen size
+            dcc.Store(
+                id="viewport-width-store",
+                data=0,
+            ),
+            # Polls the browser width so the Pareto plot can react to resizing
+            dcc.Interval(
+                id="viewport-width-poller",
+                interval=1000,
+                n_intervals=0,
+            ),
             # Download component for exporting plots and tables
             dcc.Download(id="download-plots-tables"),
             html.H1("Pareto Front Visualization (Version 2)"),

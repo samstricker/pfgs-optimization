@@ -32,7 +32,13 @@ from ..utils.data_utils import (
     load_manufacturing_df,
     load_optimization_problem,
 )
-from ..theme.plotly_theme import get_theme
+from ..theme.plotly_theme import (
+    GP_PREDICTION_RIGHT_MARGIN,
+    SQUARE_PLOT_RIGHT_MARGIN,
+    get_square_plot_dimensions,
+    get_theme,
+)
+from .investigation_space import update_investigation_space_plots
 from .pareto_front import update_pareto_front_plots, update_pareto_front_parcoords
 from .experiment_results import update_experiment_results_parcoords
 
@@ -76,14 +82,32 @@ def _export_dimensions(fig: go.Figure, plot_type: str = "default") -> tuple[int,
     rows = _subplot_domains(fig, "yaxis")
 
     # For scatter and contour plots, make each subplot square
-    if plot_type in ["experiment-results", "gp-predictions", "pareto-front"]:
-        subplot_size = 500  # Size of each subplot (square)
-        height = subplot_size * max(rows, 1)
-        width = subplot_size * max(columns, 1)
-        # Add space for legend if present (positioned to the right)
-        legend = layout.get("legend")
-        if legend and isinstance(legend, dict) and legend.get("visible", True):
-            width += 250  # Extra space for legend on the right
+    if plot_type in [
+        "experiment-results",
+        "gp-predictions",
+        "pareto-front",
+        "investigation-space",
+    ]:
+        if plot_type == "gp-predictions":
+            right_margin = GP_PREDICTION_RIGHT_MARGIN
+            horizontal_spacing = 0.12
+            vertical_spacing = 0.0
+        elif plot_type == "experiment-results":
+            right_margin = SQUARE_PLOT_RIGHT_MARGIN
+            horizontal_spacing = 0.1
+            vertical_spacing = 0.0
+        else:
+            right_margin = SQUARE_PLOT_RIGHT_MARGIN
+            horizontal_spacing = 0.12
+            vertical_spacing = 0.15
+
+        width, height = get_square_plot_dimensions(
+            columns=columns,
+            rows=rows,
+            right_margin=right_margin,
+            horizontal_spacing=horizontal_spacing,
+            vertical_spacing=vertical_spacing,
+        )
         return width, height
 
     # Original logic for parallel coordinates and other plots
@@ -230,6 +254,9 @@ def _regenerate_gp_predictions_figures(
     investigation_space_renames: dict[str, str] | None = None,
     objectives_bounds: dict[str, dict[str, float | None]] | None = None,
     pareto_mode: str = "Optimization",
+    robustness_confidence_level: int | None = None,
+    robustness_pareto_point: int | None = None,
+    alternative_expected_errors: dict | None = None,
 ) -> list[go.Figure]:
     """Regenerate GP prediction figures with current state and renames."""
     try:
@@ -666,6 +693,134 @@ def _regenerate_gp_predictions_figures(
                                 col=col,
                             )
 
+                    if (
+                        robustness_pareto_point is not None
+                        and robustness_confidence_level is not None
+                        and not pareto_df.empty
+                        and robustness_pareto_point < len(pareto_df)
+                        and var_x in pareto_df.columns
+                        and var_y in pareto_df.columns
+                    ):
+                        try:
+                            pareto_point = pareto_df.iloc[robustness_pareto_point]
+                            point_x = pareto_point[var_x]
+                            point_y = pareto_point[var_y]
+
+                            confidence_factors = {
+                                25: 0.319,
+                                50: 0.674,
+                                75: 1.150,
+                                80: 1.282,
+                                85: 1.440,
+                                90: 1.645,
+                                95: 1.960,
+                                99: 2.576,
+                            }
+                            z_score = confidence_factors.get(
+                                robustness_confidence_level, 1.960
+                            )
+
+                            x_error = None
+                            y_error = None
+                            for var in investigation_space.variables:
+                                if var.name == var_x and var.expected_error is not None:
+                                    x_error = var.expected_error
+                                elif (
+                                    var.name == var_y and var.expected_error is not None
+                                ):
+                                    y_error = var.expected_error
+
+                            if x_error is not None and y_error is not None:
+                                x_interval = z_score * x_error
+                                y_interval = z_score * y_error
+
+                                rect_x = [
+                                    point_x - x_interval,
+                                    point_x + x_interval,
+                                    point_x + x_interval,
+                                    point_x - x_interval,
+                                    point_x - x_interval,
+                                ]
+                                rect_y = [
+                                    point_y - y_interval,
+                                    point_y - y_interval,
+                                    point_y + y_interval,
+                                    point_y + y_interval,
+                                    point_y - y_interval,
+                                ]
+
+                                fig.add_trace(
+                                    go.Scatter(
+                                        x=rect_x,
+                                        y=rect_y,
+                                        mode="lines",
+                                        line=dict(color="red", width=2, dash="dash"),
+                                        hovertemplate="<b>Confidence Box</b><br>"
+                                        f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
+                                        name=f"Confidence Box ({robustness_confidence_level}%)",
+                                        showlegend=True,
+                                        fill="toself",
+                                        fillcolor="rgba(255,0,0,0.05)",
+                                    ),
+                                    row=1,
+                                    col=col,
+                                )
+
+                                if alternative_expected_errors and (
+                                    var_x in alternative_expected_errors
+                                    or var_y in alternative_expected_errors
+                                ):
+                                    alt_x_error = alternative_expected_errors.get(
+                                        var_x, x_error
+                                    )
+                                    alt_y_error = alternative_expected_errors.get(
+                                        var_y, y_error
+                                    )
+
+                                    if (
+                                        alt_x_error is not None
+                                        and alt_y_error is not None
+                                    ):
+                                        alt_x_interval = z_score * alt_x_error
+                                        alt_y_interval = z_score * alt_y_error
+                                        alt_rect_x = [
+                                            point_x - alt_x_interval,
+                                            point_x + alt_x_interval,
+                                            point_x + alt_x_interval,
+                                            point_x - alt_x_interval,
+                                            point_x - alt_x_interval,
+                                        ]
+                                        alt_rect_y = [
+                                            point_y - alt_y_interval,
+                                            point_y - alt_y_interval,
+                                            point_y + alt_y_interval,
+                                            point_y + alt_y_interval,
+                                            point_y - alt_y_interval,
+                                        ]
+
+                                        fig.add_trace(
+                                            go.Scatter(
+                                                x=alt_rect_x,
+                                                y=alt_rect_y,
+                                                mode="lines",
+                                                line=dict(
+                                                    color="purple",
+                                                    width=2,
+                                                    dash="dash",
+                                                ),
+                                                hovertemplate="<b>Alternative Confidence Box</b><br>"
+                                                f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
+                                                name=f"Alternative Box ({robustness_confidence_level}%)",
+                                                showlegend=True,
+                                                fill="toself",
+                                                fillcolor="rgba(0,255,0,0.05)",
+                                            ),
+                                            row=1,
+                                            col=col,
+                                        )
+                        except (KeyError, AttributeError, ValueError):
+                            pass
+
                     if var_x in var_to_filter and var_y in var_to_filter:
                         selected_x_ref = var_to_filter[var_x]
                         selected_y_ref = var_to_filter[var_y]
@@ -696,7 +851,12 @@ def _regenerate_gp_predictions_figures(
                 hovermode="closest",
                 title_text=f"GP Prediction: {pred_label}",
                 legend=dict(
-                    orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.35
+                    orientation="v",
+                    yanchor="top",
+                    y=1.0,
+                    xanchor="left",
+                    x=1.35,
+                    entrywidth=300,
                 ),
             )
             figures.append(fig)
@@ -831,6 +991,10 @@ def _export_pareto_front_csv(
     State("objective-renames-store", "data"),
     State("investigation-space-renames-store", "data"),
     State("measurement-renames-store", "data"),
+    State("gp-predictions-figures-store", "data"),
+    State("robustness-confidence-level", "value"),
+    State("robustness-pareto-point", "value"),
+    State("alternative-expected-error-store", "data"),
     State("parcoords-columns-checklist", "value"),
     State("parcoords-visibility-checklist", "value"),
     State("pareto-mode-store", "data"),
@@ -846,6 +1010,10 @@ def download_current_plots(
     objective_renames: dict[str, str],
     investigation_space_renames: dict[str, str],
     measurement_renames: dict[str, str],
+    gp_prediction_figures_store: list[dict] | None,
+    robustness_confidence_level: int | None,
+    robustness_pareto_point: int | None,
+    alternative_expected_errors: dict | None,
     selected_parcoords_columns: list[str] | None,
     parcoords_visibility: list[str] | None,
     pareto_mode: str,
@@ -867,15 +1035,40 @@ def download_current_plots(
         for index, fig in enumerate(exp_figures, start=1):
             figures.append((f"experiment-results-{index:02d}", fig))
 
-        gp_figures = _regenerate_gp_predictions_figures(
+        investigation_space_figure = update_investigation_space_plots(
             mlflow_run,
             iteration,
             clicked_points,
             pinned_points,
-            measurement_renames,
             investigation_space_renames,
+            measurement_renames,
+            objective_renames,
             objectives_bounds,
+            pareto_mode,
         )
+        figures.append(("investigation-space", investigation_space_figure))
+
+        gp_figures = []
+        if gp_prediction_figures_store:
+            gp_figures = [
+                _figure_from_store(figure_data)
+                for figure_data in gp_prediction_figures_store
+            ]
+
+        if not gp_figures:
+            gp_figures = _regenerate_gp_predictions_figures(
+                mlflow_run,
+                iteration,
+                clicked_points,
+                pinned_points,
+                measurement_renames,
+                investigation_space_renames,
+                objectives_bounds,
+                pareto_mode,
+                robustness_confidence_level,
+                robustness_pareto_point,
+                alternative_expected_errors,
+            )
         for index, fig in enumerate(gp_figures, start=1):
             figures.append((f"gp-predictions-{index:02d}", fig))
 
@@ -933,6 +1126,8 @@ def download_current_plots(
                     plot_type = "gp-predictions"
                 elif "pareto-front" in prefix and "parcoords" not in prefix:
                     plot_type = "pareto-front"
+                elif "investigation-space" in prefix:
+                    plot_type = "investigation-space"
                 else:
                     plot_type = "default"
 
@@ -996,6 +1191,7 @@ def download_current_plots(
                 "This archive contains exports of the current dashboard plots and tables.\n\n"
                 "PLOTS:\n"
                 "  - experiment-results-*.png: Experiment results scatter plots\n"
+                "  - investigation-space.png: Investigation space scatter plot\n"
                 "  - experiment-results-parcoords.png: Experiment results parallel coordinates plot\n"
                 "  - gp-predictions-*.png: GP prediction contour plots\n"
                 "  - pareto-front.png: Pareto front scatter plots\n"
@@ -1006,6 +1202,7 @@ def download_current_plots(
                     "Open any .html file in your browser to view and interact with the plot.\n\n"
                     "PLOTS:\n"
                     "  - experiment-results-*.html: Experiment results scatter plots\n"
+                    "  - investigation-space.html: Investigation space scatter plot\n"
                     "  - experiment-results-parcoords.html: Experiment results parallel coordinates plot\n"
                     "  - gp-predictions-*.html: GP prediction contour plots\n"
                     "  - pareto-front.html: Pareto front scatter plots\n"

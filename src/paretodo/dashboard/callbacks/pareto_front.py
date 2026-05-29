@@ -7,7 +7,6 @@ __all__ = [
     "update_parcoords_column_options",
 ]
 
-from pathlib import Path
 from typing import Any
 import traceback
 
@@ -17,12 +16,11 @@ import plotly.graph_objects as go
 from dash import ALL, Input, Output, callback_context, html
 from plotly.subplots import make_subplots
 
-from paretodo.data_models import OptimizationProblem
-
 from ..server import app
 from ..utils.table_components import create_pareto_details_table
 from ..utils.plotting_utils import build_hovertemplate
 from ..utils.data_utils import load_manufacturing_df, load_optimization_problem
+from ..theme.plotly_theme import get_square_plot_dimensions
 from ..utils.types_and_constants import (
     LOCAL_TEMP_DIR,
     BoundsDict,
@@ -62,6 +60,24 @@ def _should_add_diagonal_line(x_display: str, y_display: str) -> bool:
     return False
 
 
+def _column_count_for_viewport(viewport_width: int | None, max_columns: int) -> int:
+    """Pick the Pareto subplot column count from the current viewport width."""
+    if max_columns <= 1:
+        return 1
+
+    if not viewport_width or viewport_width <= 0:
+        return min(3, max_columns)
+
+    if viewport_width < 1100:
+        desired_columns = 1
+    elif viewport_width < 1700:
+        desired_columns = 2
+    else:
+        desired_columns = 3
+
+    return max(1, min(desired_columns, max_columns))
+
+
 @app.callback(
     Output("pareto-front-graph", "figure"),
     Input("mlflow-run", "value"),
@@ -73,6 +89,7 @@ def _should_add_diagonal_line(x_display: str, y_display: str) -> bool:
     Input("investigation-space-renames-store", "data"),
     Input("measurement-renames-store", "data"),
     Input("pareto-mode-store", "data"),
+    Input("viewport-width-store", "data"),
     prevent_initial_call=True,
 )
 def update_pareto_front_plots(
@@ -85,6 +102,7 @@ def update_pareto_front_plots(
     investigation_space_renames: dict[str, str],
     measurement_renames: RenamesDict,
     pareto_mode: str,
+    viewport_width: int | None = None,
 ) -> go.Figure:
     """Create x-y scatter plots for all objective combinations using subplots.
 
@@ -146,7 +164,7 @@ def update_pareto_front_plots(
 
         # Calculate grid dimensions
         num_plots = len(objective_pairs)
-        cols = 3
+        cols = _column_count_for_viewport(viewport_width, num_plots)
         rows = (num_plots + cols - 1) // cols  # Round up division
 
         # Create subplot figure
@@ -192,14 +210,11 @@ def update_pareto_front_plots(
                     clicked_indices = list(clicked_indices) if clicked_indices else []
                 clicked_indices = [int(x) for x in clicked_indices if x is not None]
 
-            # Create marker property arrays (excluding clicked points that will be shown separately)
-            pareto_indices = pareto_df.index.tolist()
-            colors = []
-            sizes = []
-            symbols = []
-            opacity = []
+            # Split pareto points into inside/outside groups so export keeps colors stable
+            pareto_inside_bounds = []
+            pareto_outside_bounds = []
 
-            for idx in pareto_indices:
+            for idx in pareto_df.index:
 
                 # Check if point is outside ANY specified bounds
                 is_outside_bounds = False
@@ -239,15 +254,9 @@ def update_pareto_front_plots(
                                 break
 
                 if is_outside_bounds:
-                    colors.append(MARKER_COLORS["discarded"])
-                    symbols.append("circle")
-                    sizes.append(10)
-                    opacity.append(1.0)
+                    pareto_outside_bounds.append(idx)
                 else:
-                    colors.append(MARKER_COLORS["pareto"])
-                    symbols.append("circle")
-                    sizes.append(10)
-                    opacity.append(1.0)
+                    pareto_inside_bounds.append(idx)
 
             # Build hovertemplate with renamed display names
             hovertemplate = build_hovertemplate(
@@ -258,26 +267,57 @@ def update_pareto_front_plots(
                 measurement_renames=measurement_renames,
             )
 
-            fig.add_trace(
-                go.Scatter(
-                    x=pareto_df[obj_x_name],
-                    y=pareto_df[obj_y_name],
-                    mode="markers",
-                    marker=dict(
-                        color=colors,
-                        size=sizes,
-                        line=dict(width=2, color="black"),
-                        symbol=symbols,
-                        opacity=opacity,
+            if pareto_inside_bounds:
+                inside_pareto_df = pareto_df.loc[pareto_inside_bounds]
+                inside_customdata = []
+                for idx, row_data in inside_pareto_df.iterrows():  # type: ignore[assignment]
+                    inside_customdata.append([int(idx)] + row_data.tolist())  # type: ignore[arg-type]
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=inside_pareto_df[obj_x_name],
+                        y=inside_pareto_df[obj_y_name],
+                        mode="markers",
+                        marker=dict(
+                            size=10,
+                            color=MARKER_COLORS["pareto"],
+                            line=dict(width=2, color="black"),
+                            symbol="circle",
+                        ),
+                        name=MARKER_NAMES["pareto"],
+                        customdata=inside_customdata,  # type: ignore
+                        hovertemplate=hovertemplate,
+                        showlegend=(plot_idx == 0),
                     ),
-                    name=MARKER_NAMES["pareto"],
-                    customdata=customdata_with_index,  # type: ignore
-                    hovertemplate=hovertemplate,
-                    showlegend=(plot_idx == 0),
-                ),
-                row=row,
-                col=col,
-            )
+                    row=row,
+                    col=col,
+                )
+
+            if pareto_outside_bounds:
+                outside_pareto_df = pareto_df.loc[pareto_outside_bounds]
+                outside_customdata = []
+                for idx, row_data in outside_pareto_df.iterrows():  # type: ignore[assignment]
+                    outside_customdata.append([int(idx)] + row_data.tolist())  # type: ignore[arg-type]
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=outside_pareto_df[obj_x_name],
+                        y=outside_pareto_df[obj_y_name],
+                        mode="markers",
+                        marker=dict(
+                            size=10,
+                            color=MARKER_COLORS["discarded"],
+                            line=dict(width=2, color="black"),
+                            symbol="circle",
+                        ),
+                        name=MARKER_NAMES["discarded"],
+                        customdata=outside_customdata,  # type: ignore
+                        hovertemplate=hovertemplate,
+                        showlegend=(plot_idx == 0),
+                    ),
+                    row=row,
+                    col=col,
+                )
 
             # Add manual selected points as orange crosses
             if clicked_indices:
@@ -420,8 +460,15 @@ def update_pareto_front_plots(
                 except (ValueError, TypeError):
                     pass  # Skip if calculation fails
 
+        width, height = get_square_plot_dimensions(
+            columns=cols,
+            rows=rows,
+            horizontal_spacing=0.12,
+            vertical_spacing=0.15,
+        )
         fig.update_layout(
-            height=400 * rows + 100,
+            width=width,
+            height=height,
             showlegend=True,
             hovermode="closest",
         )
@@ -842,7 +889,7 @@ def update_pareto_front_parcoords(
             height=700,
             title="Pareto Front - Parallel Coordinates",
             font=dict(size=12),
-            margin=dict(b=150),
+            margin=dict(l=80, r=40, b=150),
         )
 
         return fig

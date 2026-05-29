@@ -25,7 +25,11 @@ from ..utils.types_and_constants import (
     MARKER_COLORS,
     MARKER_NAMES,
 )
-from ..theme.plotly_theme import get_theme
+from ..theme.plotly_theme import (
+    GP_PREDICTION_RIGHT_MARGIN,
+    get_square_plot_dimensions,
+    get_theme,
+)
 from ..utils.data_utils import load_manufacturing_df
 
 
@@ -158,6 +162,51 @@ def populate_robustness_pareto_points(
 
     except (FileNotFoundError, KeyError, ValueError, TypeError):
         return []
+
+
+def _split_pareto_points_by_bounds(
+    pareto_df: pd.DataFrame, objectives_bounds: dict | None
+) -> tuple[list[int], list[int]]:
+    """Split Pareto points into inside- and outside-bounds index lists."""
+    inside_bounds_indices: list[int] = []
+    outside_bounds_indices: list[int] = []
+
+    objective_cols = [col for col in pareto_df.columns if col.startswith("obj:")]
+    if not isinstance(objectives_bounds, dict) or not objective_cols:
+        return list(pareto_df.index), []
+
+    for idx in pareto_df.index:
+        is_outside_bounds = False
+        for obj_col in objective_cols:
+            if obj_col not in objectives_bounds:
+                continue
+
+            bounds = objectives_bounds[obj_col]
+            value = pareto_df.loc[idx, obj_col]
+            try:
+                min_val = bounds.get("min")
+                max_val = bounds.get("max")
+                min_bound = float(min_val) if min_val is not None else None
+                max_bound = float(max_val) if max_val is not None else None
+                if isinstance(value, complex):
+                    continue
+                value_float = float(value)
+            except (ValueError, TypeError):
+                continue
+
+            if min_bound is not None and value_float < min_bound:
+                is_outside_bounds = True
+                break
+            if max_bound is not None and value_float > max_bound:
+                is_outside_bounds = True
+                break
+
+        if is_outside_bounds:
+            outside_bounds_indices.append(int(idx))
+        else:
+            inside_bounds_indices.append(int(idx))
+
+    return inside_bounds_indices, outside_bounds_indices
 
 
 @app.callback(
@@ -483,129 +532,20 @@ def update_gp_predictions(
                                 col=col,
                             )
 
-                    # Add blue circles for Pareto front (or black if outside bounds)
-                    if (
-                        not pareto_df.empty
-                        and var_x in pareto_df.columns
-                        and var_y in pareto_df.columns
-                    ):
-                        # Get objective columns
-                        objective_cols = [
-                            col for col in pareto_df.columns if col.startswith("obj:")
-                        ]
-
-                        # Separate pareto points by outside bounds status
-                        inside_bounds_indices = []
-                        outside_bounds_indices = []
-
-                        for idx in pareto_df.index:
-                            is_outside_bounds = False
-                            if objectives_bounds and isinstance(
-                                objectives_bounds, dict
-                            ):
-                                for obj_col in objective_cols:
-                                    if (
-                                        obj_col in objectives_bounds
-                                        and obj_col in pareto_df.columns
-                                    ):
-                                        bounds = objectives_bounds[obj_col]
-                                        value = pareto_df.loc[idx, obj_col]
-                                        try:
-                                            min_val = bounds.get("min")
-                                            max_val = bounds.get("max")
-                                            min_bound = (
-                                                float(min_val)
-                                                if min_val is not None
-                                                else None
-                                            )
-                                            max_bound = (
-                                                float(max_val)
-                                                if max_val is not None
-                                                else None
-                                            )
-                                            if isinstance(value, complex):
-                                                continue
-                                            value_float = float(value)  # type: ignore
-                                        except (ValueError, TypeError):
-                                            continue
-
-                                        if (
-                                            min_bound is not None
-                                            and value_float < min_bound
-                                        ):
-                                            is_outside_bounds = True
-                                            break
-                                        if (
-                                            max_bound is not None
-                                            and value_float > max_bound
-                                        ):
-                                            is_outside_bounds = True
-                                            break
-
-                            if is_outside_bounds:
-                                outside_bounds_indices.append(idx)
-                            else:
-                                inside_bounds_indices.append(idx)
-
-                        # Add inside bounds Pareto points (blue circles)
-                        if inside_bounds_indices:
-                            inside_pareto_df = pareto_df.iloc[inside_bounds_indices]
-                            fig.add_trace(
-                                go.Scatter(
-                                    x=inside_pareto_df[var_x],
-                                    y=inside_pareto_df[var_y],
-                                    mode="markers",
-                                    marker=dict(
-                                        size=8,
-                                        symbol="circle",
-                                        color=MARKER_COLORS["pareto"],
-                                        line=dict(width=1.5, color="white"),
-                                    ),
-                                    name=MARKER_NAMES["pareto"],
-                                    hovertemplate="<b>Pareto Point</b><extra></extra>",
-                                    showlegend=True,
-                                ),
-                                row=1,
-                                col=col,
-                            )
-
-                        # Add outside bounds Pareto points (black circles)
-                        if outside_bounds_indices:
-                            outside_pareto_df = pareto_df.iloc[outside_bounds_indices]
-                            fig.add_trace(
-                                go.Scatter(
-                                    x=outside_pareto_df[var_x],
-                                    y=outside_pareto_df[var_y],
-                                    mode="markers",
-                                    marker=dict(
-                                        size=8,
-                                        symbol="circle",
-                                        color=MARKER_COLORS["discarded"],
-                                        line=dict(width=1.5, color="white"),
-                                    ),
-                                    name=MARKER_NAMES["discarded"],
-                                    hovertemplate="<b>Pareto Point (Excluded)</b><extra></extra>",
-                                    showlegend=True,
-                                ),
-                                row=1,
-                                col=col,
-                            )
-
                     # Add orange crosses for selected experiments
-                    selected_exp_indices = []
-                    if (
-                        isinstance(clicked_points, dict)
-                        and "experiment-results" in clicked_points
-                    ):
-                        selected_exp_indices = clicked_points["experiment-results"]
-                        if not isinstance(selected_exp_indices, list):
-                            selected_exp_indices = (
-                                list(selected_exp_indices)
-                                if selected_exp_indices is not None
+                    selected_exp_indices: list[int] = []
+                    if isinstance(clicked_points, dict):
+                        experiment_indices = clicked_points.get(
+                            "experiment-results", []
+                        )
+                        if not isinstance(experiment_indices, list):
+                            experiment_indices = (
+                                list(experiment_indices)
+                                if experiment_indices is not None
                                 else []
                             )
                         selected_exp_indices = [
-                            x for x in selected_exp_indices if x is not None
+                            int(x) for x in experiment_indices if x is not None
                         ]
 
                     if selected_exp_indices and not experiments_df.empty:
@@ -639,6 +579,52 @@ def update_gp_predictions(
                                 row=1,
                                 col=col,
                             )
+
+                    pareto_inside_bounds, pareto_outside_bounds = (
+                        _split_pareto_points_by_bounds(pareto_df, objectives_bounds)
+                    )
+
+                    if pareto_inside_bounds:
+                        inside_pareto_df = pareto_df.loc[pareto_inside_bounds]
+                        fig.add_trace(
+                            go.Scatter(
+                                x=inside_pareto_df[var_x],
+                                y=inside_pareto_df[var_y],
+                                mode="markers",
+                                marker=dict(
+                                    size=10,
+                                    symbol=MARKER_SYMBOLS["pareto"],
+                                    color=MARKER_COLORS["pareto"],
+                                    line=dict(width=2, color="black"),
+                                ),
+                                hovertemplate="<b>Pareto Point</b><extra></extra>",
+                                name=MARKER_NAMES["pareto"],
+                                showlegend=(col_idx == 0),
+                            ),
+                            row=1,
+                            col=col,
+                        )
+
+                    if pareto_outside_bounds:
+                        outside_pareto_df = pareto_df.loc[pareto_outside_bounds]
+                        fig.add_trace(
+                            go.Scatter(
+                                x=outside_pareto_df[var_x],
+                                y=outside_pareto_df[var_y],
+                                mode="markers",
+                                marker=dict(
+                                    size=10,
+                                    symbol=MARKER_SYMBOLS["pareto"],
+                                    color=MARKER_COLORS["discarded"],
+                                    line=dict(width=2, color="black"),
+                                ),
+                                hovertemplate="<b>Pareto Point (Excluded)</b><extra></extra>",
+                                name=MARKER_NAMES["discarded"],
+                                showlegend=(col_idx == 0),
+                            ),
+                            row=1,
+                            col=col,
+                        )
 
                     # Add yellow X for selected Pareto points
                     selected_pareto_indices = []
@@ -983,14 +969,18 @@ def update_gp_predictions(
                 if not measurement_renames
                 else measurement_renames.get(prediction_col, prediction_col)
             )
+            width, height = get_square_plot_dimensions(
+                columns=num_cols,
+                rows=1,
+                horizontal_spacing=0.12,
+                right_margin=GP_PREDICTION_RIGHT_MARGIN,
+            )
             fig.update_layout(
-                height=500,
+                width=width,
+                height=height,
                 showlegend=True,
                 hovermode="closest",
                 title_text=f"GP Prediction: {pred_label}",
-                legend=dict(
-                    orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.2
-                ),
             )
 
             # Create a graph component for this prediction
@@ -1026,22 +1016,24 @@ def update_gp_predictions(
     Input("mlflow-run", "value"),
     Input("iteration", "value"),
     Input({"type": "gp-filter-dropdown", "index": ALL}, "value"),
-    Input("clicked-points-store", "data"),
-    Input("pinned-points-store", "data"),
     Input("measurement-renames-store", "data"),
     Input("investigation-space-renames-store", "data"),
     Input("objectives-bounds-store", "data"),
+    Input("robustness-confidence-level", "value"),
+    Input("robustness-pareto-point", "value"),
+    Input("alternative-expected-error-store", "data"),
     prevent_initial_call=True,
 )
 def store_gp_predictions_figures(
     mlflow_run: str | None,
     iteration: str | None,
     filter_values: list[float],
-    clicked_points: dict,
-    pinned_points: dict | None,
     measurement_renames: dict,
     investigation_space_renames: dict,
     objectives_bounds: dict | None,
+    robustness_confidence_level: int | None,
+    robustness_pareto_point: int | None,
+    alternative_expected_errors: dict | None,
 ) -> list[dict]:
     """Store GP prediction figures for download."""
     if mlflow_run is None or iteration is None:
@@ -1393,6 +1385,135 @@ def store_gp_predictions_figures(
                                 col=col,
                             )
 
+                    if (
+                        robustness_pareto_point is not None
+                        and robustness_confidence_level is not None
+                        and not pareto_df.empty
+                        and robustness_pareto_point < len(pareto_df)
+                        and var_x in pareto_df.columns
+                        and var_y in pareto_df.columns
+                    ):
+                        try:
+                            pareto_point = pareto_df.iloc[robustness_pareto_point]
+                            point_x = pareto_point[var_x]
+                            point_y = pareto_point[var_y]
+
+                            confidence_factors = {
+                                25: 0.319,
+                                50: 0.674,
+                                75: 1.150,
+                                80: 1.282,
+                                85: 1.440,
+                                90: 1.645,
+                                95: 1.960,
+                                99: 2.576,
+                            }
+                            z_score = confidence_factors.get(
+                                robustness_confidence_level, 1.960
+                            )
+
+                            x_error = None
+                            y_error = None
+                            for var in variables:
+                                if var.name == var_x and var.expected_error is not None:
+                                    x_error = var.expected_error
+                                elif (
+                                    var.name == var_y and var.expected_error is not None
+                                ):
+                                    y_error = var.expected_error
+
+                            if x_error is not None and y_error is not None:
+                                x_interval = z_score * x_error
+                                y_interval = z_score * y_error
+
+                                rect_x = [
+                                    point_x - x_interval,
+                                    point_x + x_interval,
+                                    point_x + x_interval,
+                                    point_x - x_interval,
+                                    point_x - x_interval,
+                                ]
+                                rect_y = [
+                                    point_y - y_interval,
+                                    point_y - y_interval,
+                                    point_y + y_interval,
+                                    point_y + y_interval,
+                                    point_y - y_interval,
+                                ]
+
+                                fig.add_trace(
+                                    go.Scatter(
+                                        x=rect_x,
+                                        y=rect_y,
+                                        mode="lines",
+                                        line=dict(color="red", width=2, dash="dash"),
+                                        hovertemplate="<b>Confidence Box</b><br>"
+                                        f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
+                                        name=f"Confidence Box ({robustness_confidence_level}%)",
+                                        showlegend=True,
+                                        fill="toself",
+                                        fillcolor="rgba(255,0,0,0.05)",
+                                    ),
+                                    row=1,
+                                    col=col,
+                                )
+
+                                if alternative_expected_errors and (
+                                    var_x in alternative_expected_errors
+                                    or var_y in alternative_expected_errors
+                                ):
+                                    alt_x_error = alternative_expected_errors.get(
+                                        var_x, x_error
+                                    )
+                                    alt_y_error = alternative_expected_errors.get(
+                                        var_y, y_error
+                                    )
+
+                                    if (
+                                        alt_x_error is not None
+                                        and alt_y_error is not None
+                                    ):
+                                        alt_x_interval = z_score * alt_x_error
+                                        alt_y_interval = z_score * alt_y_error
+                                        alt_rect_x = [
+                                            point_x - alt_x_interval,
+                                            point_x + alt_x_interval,
+                                            point_x + alt_x_interval,
+                                            point_x - alt_x_interval,
+                                            point_x - alt_x_interval,
+                                        ]
+                                        alt_rect_y = [
+                                            point_y - alt_y_interval,
+                                            point_y - alt_y_interval,
+                                            point_y + alt_y_interval,
+                                            point_y + alt_y_interval,
+                                            point_y - alt_y_interval,
+                                        ]
+
+                                        fig.add_trace(
+                                            go.Scatter(
+                                                x=alt_rect_x,
+                                                y=alt_rect_y,
+                                                mode="lines",
+                                                line=dict(
+                                                    color="purple",
+                                                    width=2,
+                                                    dash="dash",
+                                                ),
+                                                hovertemplate="<b>Alternative Confidence Box</b><br>"
+                                                f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
+                                                name=f"Alternative Box ({robustness_confidence_level}%)",
+                                                showlegend=True,
+                                                fill="toself",
+                                                fillcolor="rgba(0,255,0,0.05)",
+                                            ),
+                                            row=1,
+                                            col=col,
+                                        )
+
+                        except (KeyError, AttributeError, ValueError):
+                            pass
+
                     # Get bounds from pair_variables
                     x_min = pair_variables[col_idx][0].min
                     x_max = pair_variables[col_idx][0].max
@@ -1420,14 +1541,18 @@ def store_gp_predictions_figures(
                 if not measurement_renames
                 else measurement_renames.get(prediction_col, prediction_col)
             )
+            width, height = get_square_plot_dimensions(
+                columns=num_cols,
+                rows=1,
+                horizontal_spacing=0.12,
+                right_margin=GP_PREDICTION_RIGHT_MARGIN,
+            )
             fig.update_layout(
-                height=500,
+                width=width,
+                height=height,
                 showlegend=True,
                 hovermode="closest",
                 title_text=f"GP Prediction: {pred_label}",
-                legend=dict(
-                    orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.2
-                ),
             )
             figures.append(fig.to_dict())
 

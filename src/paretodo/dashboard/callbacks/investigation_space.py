@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 from dash import Input, Output
 from plotly.subplots import make_subplots
 
-from paretodo.data_models import InvestigationSpace, OptimizationProblem
+from paretodo.data_models import InvestigationSpace
 
 from ..server import app
 from ..utils.plotting_utils import build_hovertemplate
@@ -21,7 +21,7 @@ from ..utils.types_and_constants import (
     MARKER_NAMES,
     RenamesDict,
 )
-from ..theme.plotly_theme import get_theme
+from ..theme.plotly_theme import get_square_plot_dimensions, get_theme
 from ..utils.data_utils import load_manufacturing_df, load_optimization_problem
 
 
@@ -535,8 +535,15 @@ def update_investigation_space_plots(
 
             plot_idx += 1
 
+        width, height = get_square_plot_dimensions(
+            columns=cols,
+            rows=rows,
+            horizontal_spacing=0.12,
+            vertical_spacing=0.15,
+        )
         fig.update_layout(
-            height=400 * rows + 100,
+            width=width,
+            height=height,
             showlegend=True,
             hovermode="closest",
         )

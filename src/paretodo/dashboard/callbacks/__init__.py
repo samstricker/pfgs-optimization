@@ -8,6 +8,7 @@ from ..theme.plotly_theme import register_theme
 from . import (
     point_selection,
     state_management,
+    viewport,
     data_loading,
     experiment_results,
     pareto_front,
@@ -29,6 +30,7 @@ register_theme()
 
 __all__.extend(point_selection.__all__)
 __all__.extend(state_management.__all__)
+__all__.extend(viewport.__all__)
 __all__.extend(experiment_results.__all__)
 __all__.extend(pareto_front.__all__)
 __all__.extend(gp_prediction.__all__)

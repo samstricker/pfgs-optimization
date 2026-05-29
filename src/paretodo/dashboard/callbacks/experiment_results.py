@@ -15,7 +15,7 @@ from ..utils.data_utils import (
     get_variable_pairs,
 )
 from ..utils.plotting_utils import get_display_name
-from ..theme.plotly_theme import get_theme
+from ..theme.plotly_theme import get_square_plot_dimensions, get_theme
 from ..utils.types_and_constants import MARKER_COLORS, MARKER_SYMBOLS
 from ..utils.types_and_constants import ClickedPointsData, RenamesDict
 
@@ -154,8 +154,14 @@ def update_experiment_results(
                     col=col,
                 )
 
+            width, height = get_square_plot_dimensions(
+                columns=num_cols,
+                rows=1,
+                horizontal_spacing=0.1,
+            )
             fig.update_layout(
-                height=500,
+                width=width,
+                height=height,
                 showlegend=False,
                 hovermode="closest",
                 title_text=f"Measurement: {get_display_name(measurement_col, measurement_renames)}",
@@ -293,7 +299,17 @@ def store_experiment_results_figures(
                 fig.update_xaxes(title_text=var_x, row=1, col=col)
                 fig.update_yaxes(title_text=var_y, row=1, col=col)
 
-            fig.update_layout(template=get_theme(), height=500, showlegend=False)
+            width, height = get_square_plot_dimensions(
+                columns=num_cols,
+                rows=1,
+                horizontal_spacing=0.1,
+            )
+            fig.update_layout(
+                template=get_theme(),
+                width=width,
+                height=height,
+                showlegend=False,
+            )
             figures.append(fig.to_dict())
 
         return figures
@@ -327,7 +343,7 @@ def update_experiment_results_parcoords(
     try:
         investigation_space = load_investigation_space(mlflow_run)
         experiments_df = load_experiments_df(mlflow_run, iteration)
-        
+
         variables = investigation_space.variables
         if len(variables) < 1:
             fig = go.Figure()
@@ -335,11 +351,11 @@ def update_experiment_results_parcoords(
             fig.add_annotation(text="No variables to display")
             return fig
 
-        var_names = [v.name for v in variables]
-
         # Select all numeric columns from the dataframe
-        numeric_cols = experiments_df.select_dtypes(include=[np.number]).columns.tolist()
-        
+        numeric_cols = experiments_df.select_dtypes(
+            include=[np.number]
+        ).columns.tolist()
+
         if not numeric_cols:
             fig = go.Figure()
             fig.update_layout(template=get_theme())
@@ -357,7 +373,9 @@ def update_experiment_results_parcoords(
         # Create dimensions for parallel coordinates plot
         dimensions = []
         for col in numeric_cols:
-            label = get_display_name(col, investigation_space_renames or measurement_renames)
+            label = get_display_name(
+                col, investigation_space_renames or measurement_renames
+            )
             try:
                 min_val = experiments_df[col].min()
                 max_val = experiments_df[col].max()
@@ -405,7 +423,7 @@ def update_experiment_results_parcoords(
             height=700,
             title="Experiment Results - Parallel Coordinates",
             font=dict(size=12),
-            margin=dict(b=150),
+            margin=dict(l=80, r=40, b=150),
         )
 
         return fig
