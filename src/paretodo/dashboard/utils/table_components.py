@@ -5,7 +5,7 @@ from dash import html, dcc
 import pandas as pd
 
 from paretodo.data_models import InvestigationSpace, OptimizationProblem
-from .data_utils import load_pareto_df
+from .data_utils import load_pareto_df, load_manufacturing_df
 from .types_and_constants import (
     TABLE_HEADER_STYLE,
     TABLE_CELL_STYLE,
@@ -198,12 +198,18 @@ def create_optimization_problem_table(
     optimization_problem: OptimizationProblem,
     mlflow_run: Optional[str] = None,
     iteration: Optional[str] = None,
+    pareto_mode: str = "Optimization",
 ) -> html.Div:
     """Create table for optimization problem with rename inputs."""
     pareto_col_names = []
     if mlflow_run and iteration:
         try:
-            pareto_df = load_pareto_df(mlflow_run, iteration)
+            # Load the appropriate Pareto dataframe based on mode
+            if pareto_mode == "Manufacturing":
+                pareto_df = load_manufacturing_df(mlflow_run, iteration)
+            else:
+                pareto_df = load_pareto_df(mlflow_run, iteration)
+
             obj_columns = [col for col in pareto_df.columns if col.startswith("obj:")]
             pareto_col_names = [col.replace("obj:", "") for col in obj_columns]
         except FileNotFoundError:

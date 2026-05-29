@@ -62,6 +62,11 @@ def get_app_layout() -> html.Div:
                 id="alternative-expected-error-store",
                 data={},
             ),
+            # Store for pareto mode (Optimization or Manufacturing)
+            dcc.Store(
+                id="pareto-mode-store",
+                data="Optimization",
+            ),
             # Download component for exporting plots and tables
             dcc.Download(id="download-plots-tables"),
             html.H1("Pareto Front Visualization (Version 2)"),
@@ -141,6 +146,27 @@ def get_app_layout() -> html.Div:
                                 ],
                                 style={"marginBottom": "15px"},
                             ),
+                            html.Div(
+                                [
+                                    html.Label("Pareto Mode:"),
+                                    dcc.Dropdown(
+                                        id="pareto-mode",
+                                        options=[
+                                            {
+                                                "label": "Optimization",
+                                                "value": "Optimization",
+                                            },
+                                            {
+                                                "label": "Manufacturing",
+                                                "value": "Manufacturing",
+                                            },
+                                        ],
+                                        value="Optimization",
+                                        style={"width": "100%"},
+                                    ),
+                                ],
+                                style={"marginBottom": "15px"},
+                            ),
                             html.Button(
                                 "Download Plots & Tables",
                                 id="download-button",
@@ -212,6 +238,28 @@ def get_app_layout() -> html.Div:
             html.Div(
                 id="gp-filters-container",
                 style={"marginBottom": "20px"},
+            ),
+            html.Div(
+                [
+                    dcc.Checklist(
+                        id="gp-show-reference-point",
+                        options=[
+                            {
+                                "label": " Show Reference Point",
+                                "value": "show_ref",
+                            },
+                        ],
+                        value=["show_ref"],
+                        style={"display": "flex"},
+                        labelStyle={"marginRight": "10px"},
+                    ),
+                ],
+                style={
+                    "padding": "10px",
+                    "backgroundColor": "#f5f5f5",
+                    "borderRadius": "5px",
+                    "marginBottom": "15px",
+                },
             ),
             # Robustness Section
             html.Div(

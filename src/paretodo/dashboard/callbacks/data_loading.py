@@ -13,6 +13,7 @@ from ..server import app
 
 from ..utils.helper_functions import get_client_and_run
 from ..utils.types_and_constants import LOCAL_TEMP_DIR
+from ..utils.data_utils import load_optimization_problem
 from ..utils.table_components import (
     create_investigation_space_table,
     create_optimization_problem_table,
@@ -255,12 +256,14 @@ def download_json_files(mlflow_port, mlflow_experiment, mlflow_run, iteration):
     Input("iteration", "value"),
     Input("investigation-space-renames-store", "data"),
     Input("measurement-renames-store", "data"),
+    Input("pareto-mode-store", "data"),
 )
 def update_investigation_optimization_tables(
     mlflow_run,
     iteration,
     investigation_space_renames,
     measurement_renames,
+    pareto_mode,
 ):
     """Update the investigation space and optimization problem tables.
 
@@ -323,11 +326,9 @@ def update_investigation_optimization_tables(
             measurements_table = html.Div()
 
     try:
-        optimization_problem_data = OptimizationProblem.from_json(
-            Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/optimization_problem.json")
-        )
+        optimization_problem_data = load_optimization_problem(mlflow_run, pareto_mode)
         optimization_problem = create_optimization_problem_table(
-            optimization_problem_data, mlflow_run, iteration
+            optimization_problem_data, mlflow_run, iteration, pareto_mode
         )
     except FileNotFoundError:
         optimization_problem = "Optimization problem data not found."
@@ -379,3 +380,23 @@ def reset_selections_on_iteration_change(iteration):
         },
         {},
     )
+
+
+@app.callback(
+    Output("pareto-mode-store", "data"),
+    Input("pareto-mode", "value"),
+)
+def update_pareto_mode(mode):
+    """Update the pareto mode store when the mode dropdown changes.
+
+    Parameters
+    ----------
+    mode : str
+        The selected mode ("Optimization" or "Manufacturing").
+
+    Returns
+    -------
+    str
+        The selected mode.
+    """
+    return mode if mode is not None else "Optimization"

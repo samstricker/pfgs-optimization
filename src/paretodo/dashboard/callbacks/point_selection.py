@@ -16,7 +16,12 @@ from ..utils.types_and_constants import (
     ObjectiveBoundsData,
     LOCAL_TEMP_DIR,
 )
-from ..utils.data_utils import load_pareto_df, load_experiments_df
+from ..utils.data_utils import (
+    load_pareto_df,
+    load_experiments_df,
+    load_manufacturing_df,
+    load_optimization_problem,
+)
 
 __all__ = ["handle_all_clicks", "automated_selection", "reset_selection"]
 
@@ -105,6 +110,7 @@ def handle_all_clicks(
     State("iteration", "value"),
     State("objectives-bounds-store", "data"),
     Input("batch-size-input", "value"),
+    State("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
 def automated_selection(
@@ -113,6 +119,7 @@ def automated_selection(
     iteration: str | None,
     objectives_bounds: ObjectiveBoundsData,
     batch_size: int | None,
+    pareto_mode: str,
 ) -> dict[str, bool]:
     """Automated diversity-based selection of Pareto points using ParetoSelector.
 
@@ -134,6 +141,8 @@ def automated_selection(
         Objective bounds filter
     batch_size : int | None
         Number of points to select
+    pareto_mode : str
+        Selected mode ("Optimization" or "Manufacturing")
 
     Returns
     -------
@@ -144,15 +153,22 @@ def automated_selection(
         return {}
 
     try:
-        # Load Pareto front and experiments data
-        pareto_df = load_pareto_df(mlflow_run, iteration)
+        # Load Pareto front data based on selected mode
+        if pareto_mode == "Manufacturing":
+            pareto_df = load_manufacturing_df(mlflow_run, iteration)
+            if pareto_df.empty:
+                # Error: Manufacturing mode selected but data not available
+                print(
+                    "Error: Manufacturing data (manufacturing_front_predictions.csv) not found for automated selection"
+                )
+                return {}
+        else:
+            pareto_df = load_pareto_df(mlflow_run, iteration)
+
         experiments_df = load_experiments_df(mlflow_run, iteration)
 
         # Load optimization problem to get minimize/maximize info for each objective
-        opt_prob_path = Path(
-            f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/optimization_problem.json"
-        )
-        optimization_problem = OptimizationProblem.from_json(opt_prob_path)
+        optimization_problem = load_optimization_problem(mlflow_run, pareto_mode)
 
         # Load investigation space to get variable names
         inv_space_path = Path(

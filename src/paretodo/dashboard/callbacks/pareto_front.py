@@ -22,6 +22,7 @@ from paretodo.data_models import OptimizationProblem
 from ..server import app
 from ..utils.table_components import create_pareto_details_table
 from ..utils.plotting_utils import build_hovertemplate
+from ..utils.data_utils import load_manufacturing_df, load_optimization_problem
 from ..utils.types_and_constants import (
     LOCAL_TEMP_DIR,
     BoundsDict,
@@ -71,6 +72,7 @@ def _should_add_diagonal_line(x_display: str, y_display: str) -> bool:
     Input("objective-renames-store", "data"),
     Input("investigation-space-renames-store", "data"),
     Input("measurement-renames-store", "data"),
+    Input("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
 def update_pareto_front_plots(
@@ -82,6 +84,7 @@ def update_pareto_front_plots(
     objective_renames: dict[str, str],
     investigation_space_renames: dict[str, str],
     measurement_renames: RenamesDict,
+    pareto_mode: str,
 ) -> go.Figure:
     """Create x-y scatter plots for all objective combinations using subplots.
 
@@ -96,17 +99,25 @@ def update_pareto_front_plots(
         return fig
 
     try:
-        # Load Pareto front data
-        pareto_csv = (
-            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
-        )
-        pareto_df = pd.read_csv(pareto_csv)
+        # Load Pareto front data based on selected mode
+        if pareto_mode == "Manufacturing":
+            pareto_df = load_manufacturing_df(mlflow_run, iteration)
+            if pareto_df.empty:
+                # Error: Manufacturing mode selected but data not available
+                fig = go.Figure()
+                fig.update_layout(template=get_theme())
+                fig.add_annotation(
+                    text="Error: Manufacturing data (manufacturing_front_predictions.csv) not found for this iteration. Please check the MLflow artifacts.",
+                    showarrow=False,
+                    font=dict(size=14, color="red"),
+                )
+                return fig
+        else:
+            pareto_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+            pareto_df = pd.read_csv(pareto_csv)
 
         # Load OptimizationProblem to get actual objective names
-        opt_prob_path = Path(
-            f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/optimization_problem.json"
-        )
-        optimization_problem_data = OptimizationProblem.from_json(opt_prob_path)
+        optimization_problem_data = load_optimization_problem(mlflow_run, pareto_mode)
 
         # Create mapping from objective index to objective var_name
         objective_names_map = {}
@@ -442,6 +453,7 @@ def update_pareto_front_plots(
     Input("objective-renames-store", "data"),
     Input("investigation-space-renames-store", "data"),
     Input("measurement-renames-store", "data"),
+    Input("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
 def update_pareto_details_table(
@@ -453,21 +465,32 @@ def update_pareto_details_table(
     objective_renames: dict[str, str],
     investigation_space_renames: dict[str, str],
     measurement_renames: RenamesDict,
+    pareto_mode: str,
 ) -> tuple[html.Div, dict[str, bool]]:
     """Create a table showing detailed values for selected and pinned Pareto points."""
     if mlflow_run is None or iteration is None:
         return html.Div("No data selected"), pinned_data
 
     try:
-        # Load Pareto front data
-        pareto_df = pd.read_csv(
-            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
-        )
+        # Load Pareto front data based on selected mode
+        if pareto_mode == "Manufacturing":
+            pareto_df = load_manufacturing_df(mlflow_run, iteration)
+            if pareto_df.empty:
+                # Error: Manufacturing mode selected but data not available
+                return (
+                    html.Div(
+                        "Error: Manufacturing data (manufacturing_front_predictions.csv) not found for this iteration.",
+                        style={"color": "red", "fontWeight": "bold", "padding": "10px"},
+                    ),
+                    pinned_data,
+                )
+        else:
+            pareto_df = pd.read_csv(
+                f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+            )
 
         # Load OptimizationProblem
-        optimization_problem_data = OptimizationProblem.from_json(
-            Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/optimization_problem.json")
-        )
+        optimization_problem_data = load_optimization_problem(mlflow_run, pareto_mode)
 
         objective_names_map = {}
         for idx, axis in enumerate(optimization_problem_data.problem):
@@ -538,21 +561,29 @@ def update_pareto_details_table(
     Output("parcoords-columns-checklist", "value"),
     Input("mlflow-run", "value"),
     Input("iteration", "value"),
+    Input("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
 def update_parcoords_column_options(
     mlflow_run: str | None,
     iteration: str | None,
+    pareto_mode: str,
 ) -> tuple[list[dict], list[str]]:
     """Populate column selection checklist with available columns."""
     if mlflow_run is None or iteration is None:
         return [], []
 
     try:
-        pareto_csv = (
-            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
-        )
-        pareto_df = pd.read_csv(pareto_csv)
+        # Load Pareto front data based on selected mode
+        if pareto_mode == "Manufacturing":
+            pareto_df = load_manufacturing_df(mlflow_run, iteration)
+            if pareto_df.empty:
+                # Error: Manufacturing mode selected but data not available
+                print("Error: Manufacturing data not found for parallel coordinates")
+                return [], []
+        else:
+            pareto_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+            pareto_df = pd.read_csv(pareto_csv)
 
         # Get numeric columns
         numeric_cols = pareto_df.select_dtypes(include=[np.number]).columns.tolist()
@@ -579,6 +610,7 @@ def update_parcoords_column_options(
     Input("measurement-renames-store", "data"),
     Input("parcoords-columns-checklist", "value"),
     Input("parcoords-visibility-checklist", "value"),
+    Input("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
 def update_pareto_front_parcoords(
@@ -591,6 +623,7 @@ def update_pareto_front_parcoords(
     measurement_renames: RenamesDict,
     selected_columns: list[str],
     visibility_options: list[str],
+    pareto_mode: str,
 ) -> go.Figure:
     """Create a parallel coordinates plot for Pareto front showing all columns."""
     if mlflow_run is None or iteration is None:
@@ -599,11 +632,22 @@ def update_pareto_front_parcoords(
         return fig
 
     try:
-        # Load Pareto front data
-        pareto_csv = (
-            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
-        )
-        pareto_df = pd.read_csv(pareto_csv)
+        # Load Pareto front data based on selected mode
+        if pareto_mode == "Manufacturing":
+            pareto_df = load_manufacturing_df(mlflow_run, iteration)
+            if pareto_df.empty:
+                # Error: Manufacturing mode selected but data not available
+                fig = go.Figure()
+                fig.update_layout(template=get_theme())
+                fig.add_annotation(
+                    text="Error: Manufacturing data (manufacturing_front_predictions.csv) not found for this iteration.",
+                    showarrow=False,
+                    font=dict(size=14, color="red"),
+                )
+                return fig
+        else:
+            pareto_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+            pareto_df = pd.read_csv(pareto_csv)
 
         # Load experiments data
         try:
@@ -615,10 +659,7 @@ def update_pareto_front_parcoords(
             experiments_df = None
 
         # Load OptimizationProblem to get actual objective names
-        opt_prob_path = Path(
-            f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/optimization_problem.json"
-        )
-        optimization_problem_data = OptimizationProblem.from_json(opt_prob_path)
+        optimization_problem_data = load_optimization_problem(mlflow_run, pareto_mode)
 
         # Create mapping from objective index to objective var_name
         objective_names_map = {}

@@ -26,6 +26,7 @@ from ..utils.types_and_constants import (
     MARKER_NAMES,
 )
 from ..theme.plotly_theme import get_theme
+from ..utils.data_utils import load_manufacturing_df
 
 
 @app.callback(
@@ -105,22 +106,31 @@ def populate_gp_filters(
     Output("robustness-pareto-point", "options"),
     Input("mlflow-run", "value"),
     Input("iteration", "value"),
+    Input("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
 def populate_robustness_pareto_points(
     mlflow_run: str | None,
     iteration: str | None,
+    pareto_mode: str,
 ) -> list[dict]:
     """Populate pareto points dropdown for robustness analysis."""
     if mlflow_run is None or iteration is None:
         return []
 
     try:
-        # Load pareto front predictions
-        pareto_csv = (
-            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
-        )
-        pareto_df = pd.read_csv(pareto_csv)
+        # Load pareto front predictions based on selected mode
+        if pareto_mode == "Manufacturing":
+            pareto_df = load_manufacturing_df(mlflow_run, iteration)
+            if pareto_df.empty:
+                # Error: Manufacturing mode selected but data not available
+                print(
+                    "Error: Manufacturing data not found for robustness pareto points"
+                )
+                return []
+        else:
+            pareto_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+            pareto_df = pd.read_csv(pareto_csv)
 
         if pareto_df.empty:
             return []
@@ -163,6 +173,8 @@ def populate_robustness_pareto_points(
     Input("robustness-confidence-level", "value"),
     Input("robustness-pareto-point", "value"),
     Input("alternative-expected-error-store", "data"),
+    Input("gp-show-reference-point", "value"),
+    Input("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
 def update_gp_predictions(
@@ -177,6 +189,8 @@ def update_gp_predictions(
     robustness_confidence_level: int | None,
     robustness_pareto_point: int | None,
     alternative_expected_errors: dict[str, float] | None,
+    show_reference_point: list[str] | None,
+    pareto_mode: str,
 ) -> list[html.Div]:
     """Create contour plots for each GP prediction using variable pair layout."""
     if mlflow_run is None or iteration is None:
@@ -199,17 +213,24 @@ def update_gp_predictions(
 
         # Load experiments and Pareto front data for overlays
         experiments_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/experiments.csv"
-        pareto_csv = (
-            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
-        )
+        # Load pareto front data based on selected mode
+        if pareto_mode == "Manufacturing":
+            pareto_df = load_manufacturing_df(mlflow_run, iteration)
+            if pareto_df.empty:
+                # Error: Manufacturing mode selected but data not available
+                return [
+                    html.Div(
+                        "Error: Manufacturing data (manufacturing_front_predictions.csv) not found for this iteration.",
+                        style={"color": "red", "fontWeight": "bold", "padding": "10px"},
+                    )
+                ]
+        else:
+            pareto_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+            pareto_df = pd.read_csv(pareto_csv)
         try:
             experiments_df = pd.read_csv(experiments_csv)
         except FileNotFoundError:
             experiments_df = pd.DataFrame()
-        try:
-            pareto_df = pd.read_csv(pareto_csv)
-        except FileNotFoundError:
-            pareto_df = pd.DataFrame()
 
         variables = investigation_space.variables
         var_names = [v.name for v in variables]
@@ -343,7 +364,7 @@ def update_gp_predictions(
                                 f"<b>{y_label}</b>: %{{y:.4f}}<br>"
                                 f"<b>{z_label}</b>: %{{z:.4f}}<extra></extra>"
                             ),
-                            name="GP Prediction",
+                            name=f"Mean {z_label}",
                             showlegend=True,
                         ),
                         row=1,
@@ -757,24 +778,26 @@ def update_gp_predictions(
                             )
                             hover_text += f"<b>{pred_label}</b>: {selected_z:.4f}"
 
-                        fig.add_trace(
-                            go.Scatter(
-                                x=[selected_x],
-                                y=[selected_y],
-                                mode="markers",
-                                marker=dict(
-                                    size=12,
-                                    color="red",
-                                    symbol="diamond",
-                                    line=dict(color="black", width=2),
+                        # Add reference point only if checkbox is checked
+                        if show_reference_point and "show_ref" in show_reference_point:
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=[selected_x],
+                                    y=[selected_y],
+                                    mode="markers",
+                                    marker=dict(
+                                        size=12,
+                                        color="red",
+                                        symbol="diamond",
+                                        line=dict(color="black", width=2),
+                                    ),
+                                    hovertemplate=hover_text + "<extra></extra>",
+                                    name="Reference",
+                                    showlegend=False,
                                 ),
-                                hovertemplate=hover_text + "<extra></extra>",
-                                name="Reference",
-                                showlegend=True,
-                            ),
-                            row=1,
-                            col=col,
-                        )
+                                row=1,
+                                col=col,
+                            )
 
                     # Add robustness confidence box for selected pareto point
                     if (
@@ -1156,7 +1179,7 @@ def store_gp_predictions_figures(
                                 f"<b>{y_label}</b>: %{{y:.4f}}<br>"
                                 f"<b>{z_label}</b>: %{{z:.4f}}<extra></extra>"
                             ),
-                            name="GP Prediction",
+                            name=f"Mean {z_label}",
                             showlegend=True,
                         ),
                         row=1,
@@ -1260,6 +1283,110 @@ def store_gp_predictions_figures(
                                         line=dict(width=1, color="black"),
                                     ),
                                     showlegend=False,
+                                    hoverinfo="skip",
+                                ),
+                                row=1,
+                                col=col,
+                            )
+
+                    # Add pareto points with bounds filtering
+                    if (
+                        not pareto_df.empty
+                        and var_x in pareto_df.columns
+                        and var_y in pareto_df.columns
+                    ):
+                        objective_cols = [
+                            col for col in pareto_df.columns if col.startswith("obj:")
+                        ]
+
+                        pareto_inside_bounds = []
+                        pareto_outside_bounds = []
+
+                        for idx in pareto_df.index:
+                            is_outside_bounds = False
+                            if (
+                                objectives_bounds
+                                and isinstance(objectives_bounds, dict)
+                                and objective_cols
+                            ):
+                                for obj_col in objective_cols:
+                                    if (
+                                        obj_col in objectives_bounds
+                                        and obj_col in pareto_df.columns
+                                    ):
+                                        bounds = objectives_bounds[obj_col]
+                                        value = pareto_df.loc[idx, obj_col]
+                                        try:
+                                            min_val = bounds.get("min")
+                                            max_val = bounds.get("max")
+                                            min_bound = (
+                                                float(min_val)
+                                                if min_val is not None
+                                                else None
+                                            )
+                                            max_bound = (
+                                                float(max_val)
+                                                if max_val is not None
+                                                else None
+                                            )
+                                            if isinstance(value, complex):
+                                                continue
+                                            value_float = float(value)
+                                        except (ValueError, TypeError):
+                                            continue
+
+                                        if (
+                                            min_bound is not None
+                                            and value_float < min_bound
+                                        ):
+                                            is_outside_bounds = True
+                                            break
+                                        if (
+                                            max_bound is not None
+                                            and value_float > max_bound
+                                        ):
+                                            is_outside_bounds = True
+                                            break
+
+                            if is_outside_bounds:
+                                pareto_outside_bounds.append(idx)
+                            else:
+                                pareto_inside_bounds.append(idx)
+
+                        if pareto_inside_bounds:
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=pareto_df.loc[pareto_inside_bounds, var_x],
+                                    y=pareto_df.loc[pareto_inside_bounds, var_y],
+                                    mode="markers",
+                                    marker=dict(
+                                        size=10,
+                                        symbol="circle",
+                                        color=MARKER_COLORS["pareto"],
+                                        line=dict(width=1, color="black"),
+                                    ),
+                                    name=MARKER_NAMES["pareto"],
+                                    showlegend=True,
+                                    hoverinfo="skip",
+                                ),
+                                row=1,
+                                col=col,
+                            )
+
+                        if pareto_outside_bounds:
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=pareto_df.loc[pareto_outside_bounds, var_x],
+                                    y=pareto_df.loc[pareto_outside_bounds, var_y],
+                                    mode="markers",
+                                    marker=dict(
+                                        size=10,
+                                        symbol="circle",
+                                        color=MARKER_COLORS["discarded"],
+                                        line=dict(width=1, color="black"),
+                                    ),
+                                    name=MARKER_NAMES["discarded"],
+                                    showlegend=True,
                                     hoverinfo="skip",
                                 ),
                                 row=1,

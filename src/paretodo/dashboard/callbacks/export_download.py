@@ -17,13 +17,20 @@ from plotly.subplots import make_subplots
 from paretodo.data_models import InvestigationSpace, OptimizationProblem
 
 from ..server import app
-from ..utils.types_and_constants import LOCAL_TEMP_DIR
+from ..utils.types_and_constants import (
+    LOCAL_TEMP_DIR,
+    MARKER_COLORS,
+    MARKER_NAMES,
+    MARKER_SYMBOLS,
+)
 from ..utils.plotting_utils import get_display_name
 from ..utils.data_utils import (
     load_investigation_space,
     load_experiments_df,
     get_measurement_columns,
     get_variable_pairs,
+    load_manufacturing_df,
+    load_optimization_problem,
 )
 from ..theme.plotly_theme import get_theme
 from .pareto_front import update_pareto_front_plots, update_pareto_front_parcoords
@@ -61,13 +68,25 @@ def _subplot_domains(fig: go.Figure, axis_prefix: str) -> int:
     return max(len(domains), 1)
 
 
-def _export_dimensions(fig: go.Figure) -> tuple[int, int]:
-    """Compute consistent export dimensions for a figure."""
+def _export_dimensions(fig: go.Figure, plot_type: str = "default") -> tuple[int, int]:
+    """Compute consistent export dimensions for a figure based on type."""
     layout = fig.to_plotly_json().get("layout", {})
     title = _figure_title(fig)
     columns = _subplot_domains(fig, "xaxis")
     rows = _subplot_domains(fig, "yaxis")
 
+    # For scatter and contour plots, make each subplot square
+    if plot_type in ["experiment-results", "gp-predictions", "pareto-front"]:
+        subplot_size = 500  # Size of each subplot (square)
+        height = subplot_size * max(rows, 1)
+        width = subplot_size * max(columns, 1)
+        # Add space for legend if present (positioned to the right)
+        legend = layout.get("legend")
+        if legend and isinstance(legend, dict) and legend.get("visible", True):
+            width += 250  # Extra space for legend on the right
+        return width, height
+
+    # Original logic for parallel coordinates and other plots
     height = int(layout.get("height") or 0)
     if height <= 0:
         if "pareto front" in title.lower():
@@ -210,6 +229,7 @@ def _regenerate_gp_predictions_figures(
     measurement_renames: dict[str, str] | None = None,
     investigation_space_renames: dict[str, str] | None = None,
     objectives_bounds: dict[str, dict[str, float | None]] | None = None,
+    pareto_mode: str = "Optimization",
 ) -> list[go.Figure]:
     """Regenerate GP prediction figures with current state and renames."""
     try:
@@ -233,8 +253,18 @@ def _regenerate_gp_predictions_figures(
             experiments_df = pd.DataFrame()
 
         try:
-            pareto_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
-            pareto_df = pd.read_csv(pareto_csv)
+            # Load pareto front data based on selected mode
+            if pareto_mode == "Manufacturing":
+                pareto_df = load_manufacturing_df(mlflow_run, iteration)
+                if pareto_df.empty:
+                    # Error: Manufacturing mode selected but data not available
+                    print(
+                        "Warning: Manufacturing data not found for GP predictions export"
+                    )
+                    return []  # Return empty list if manufacturing data not found
+            else:
+                pareto_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+                pareto_df = pd.read_csv(pareto_csv)
         except FileNotFoundError:
             pareto_df = pd.DataFrame()
 
@@ -291,6 +321,17 @@ def _regenerate_gp_predictions_figures(
 
                 show_colorbar = col_idx == 0
 
+                # Define objective columns once per pair
+                objective_cols = []
+                if not experiments_df.empty:
+                    objective_cols = [
+                        c for c in experiments_df.columns if c.startswith("obj:")
+                    ]
+                elif not pareto_df.empty:
+                    objective_cols = [
+                        c for c in pareto_df.columns if c.startswith("obj:")
+                    ]
+
                 try:
                     x_vals = np.asarray(meshgrid_df[var_x], dtype=np.float64)
                     y_vals = np.asarray(meshgrid_df[var_y], dtype=np.float64)
@@ -332,7 +373,7 @@ def _regenerate_gp_predictions_figures(
                                 f"<b>{y_label}</b>: %{{y:.4f}}<br>"
                                 f"<b>{z_label}</b>: %{{z:.4f}}<extra></extra>"
                             ),
-                            name="GP Prediction",
+                            name=f"Mean {z_label}",
                             showlegend=True,
                         ),
                         row=1,
@@ -344,84 +385,93 @@ def _regenerate_gp_predictions_figures(
                         and var_x in experiments_df.columns
                         and var_y in experiments_df.columns
                     ):
-                        objective_cols = [
-                            c for c in experiments_df.columns if c.startswith("obj:")
-                        ]
                         inside_bounds = []
                         outside_bounds = []
 
+                        # Classify experiments as inside or outside bounds
                         for idx in experiments_df.index:
                             is_outside = False
-                            if objectives_bounds and objective_cols:
+                            # Only check bounds if we have objective columns and bounds dict
+                            if isinstance(objectives_bounds, dict) and objective_cols:
                                 for obj_col in objective_cols:
+                                    # Check if this objective has bounds set
                                     if obj_col in objectives_bounds:
                                         bounds = objectives_bounds[obj_col]
                                         value = experiments_df.loc[idx, obj_col]
                                         try:
+                                            min_val = bounds.get("min")
+                                            max_val = bounds.get("max")
                                             min_bound = (
-                                                float(bounds.get("min"))
-                                                if bounds.get("min") is not None
+                                                float(min_val)
+                                                if min_val is not None
                                                 else None
                                             )
                                             max_bound = (
-                                                float(bounds.get("max"))
-                                                if bounds.get("max") is not None
+                                                float(max_val)
+                                                if max_val is not None
                                                 else None
                                             )
-                                            if not isinstance(value, (int, float)):
+                                            if isinstance(value, complex):
                                                 continue
-                                            if (
-                                                min_bound is not None
-                                                and value < min_bound
-                                            ):
-                                                is_outside = True
-                                                break
-                                            if (
-                                                max_bound is not None
-                                                and value > max_bound
-                                            ):
-                                                is_outside = True
-                                                break
+                                            value_float = float(value)  # type: ignore
                                         except (ValueError, TypeError):
                                             continue
+
+                                        # Check if outside any bound
+                                        if (
+                                            min_bound is not None
+                                            and value_float < min_bound
+                                        ):
+                                            is_outside = True
+                                            break
+                                        if (
+                                            max_bound is not None
+                                            and value_float > max_bound
+                                        ):
+                                            is_outside = True
+                                            break
 
                             (outside_bounds if is_outside else inside_bounds).append(
                                 idx
                             )
 
                         if inside_bounds:
+                            inside_exp_df = experiments_df.iloc[inside_bounds]
                             fig.add_trace(
                                 go.Scatter(
-                                    x=experiments_df.loc[inside_bounds, var_x],
-                                    y=experiments_df.loc[inside_bounds, var_y],
+                                    x=inside_exp_df[var_x],
+                                    y=inside_exp_df[var_y],
                                     mode="markers",
                                     marker=dict(
-                                        size=10,
-                                        symbol="square",
-                                        color="#E885B4",
-                                        line=dict(width=1, color="black"),
+                                        size=8,
+                                        symbol=MARKER_SYMBOLS["experiment"],
+                                        color=MARKER_COLORS["experiment"],
+                                        line=dict(width=1.5, color="white"),
                                     ),
-                                    showlegend=False,
-                                    hoverinfo="skip",
+                                    name=MARKER_NAMES["experiment"],
+                                    hovertemplate="<b>Experiment</b><extra></extra>",
+                                    showlegend=True,
                                 ),
                                 row=1,
                                 col=col,
                             )
 
                         if outside_bounds:
+                            outside_exp_df = experiments_df.iloc[outside_bounds]
                             fig.add_trace(
                                 go.Scatter(
-                                    x=experiments_df.loc[outside_bounds, var_x],
-                                    y=experiments_df.loc[outside_bounds, var_y],
+                                    x=outside_exp_df[var_x],
+                                    y=outside_exp_df[var_y],
                                     mode="markers",
                                     marker=dict(
-                                        size=10,
-                                        symbol="x",
-                                        color="black",
-                                        line=dict(width=1, color="black"),
+                                        size=8,
+                                        symbol=MARKER_SYMBOLS["experiment"],
+                                        color=MARKER_COLORS["discarded"],
+                                        line=dict(width=1.5, color="white"),
                                     ),
-                                    showlegend=False,
-                                    hoverinfo="skip",
+                                    name=MARKER_NAMES["discarded"],
+                                    hovertemplate="<b>Experiment (Excluded)</b><extra></extra>",
+                                    showlegend=True,
                                 ),
                                 row=1,
                                 col=col,
@@ -448,29 +498,107 @@ def _regenerate_gp_predictions_figures(
                     print(f"Error processing pair {var_x} vs {var_y}: {e}")
                     continue
 
+                # Add pareto points with bounds filtering (outside try-except)
                 if (
                     not pareto_df.empty
                     and var_x in pareto_df.columns
                     and var_y in pareto_df.columns
                 ):
-                    fig.add_trace(
-                        go.Scatter(
-                            x=pareto_df[var_x],
-                            y=pareto_df[var_y],
-                            mode="markers",
-                            marker=dict(
-                                size=10,
-                                symbol="circle",
-                                color="#648FFF",
-                                line=dict(width=2, color="black"),
+                    # Classify pareto points as inside or outside bounds
+                    pareto_inside_bounds = []
+                    pareto_outside_bounds = []
+
+                    for idx in pareto_df.index:
+                        is_outside = False
+                        # Only check bounds if we have objective columns and bounds dict
+                        if isinstance(objectives_bounds, dict) and objective_cols:
+                            for obj_col in objective_cols:
+                                # Check if this objective has bounds set
+                                if obj_col in objectives_bounds:
+                                    bounds = objectives_bounds[obj_col]
+                                    value = pareto_df.loc[idx, obj_col]
+                                    try:
+                                        min_val = bounds.get("min")
+                                        max_val = bounds.get("max")
+                                        min_bound = (
+                                            float(min_val)
+                                            if min_val is not None
+                                            else None
+                                        )
+                                        max_bound = (
+                                            float(max_val)
+                                            if max_val is not None
+                                            else None
+                                        )
+                                        if isinstance(value, complex):
+                                            continue
+                                        value_float = float(value)  # type: ignore
+                                    except (ValueError, TypeError):
+                                        continue
+
+                                    # Check if outside any bound
+                                    if (
+                                        min_bound is not None
+                                        and value_float < min_bound
+                                    ):
+                                        is_outside = True
+                                        break
+                                    if (
+                                        max_bound is not None
+                                        and value_float > max_bound
+                                    ):
+                                        is_outside = True
+                                        break
+
+                        (
+                            pareto_outside_bounds
+                            if is_outside
+                            else pareto_inside_bounds
+                        ).append(idx)
+
+                    # Add inside bounds pareto points
+                    if pareto_inside_bounds:
+                        inside_pareto_df = pareto_df.loc[pareto_inside_bounds]
+                        fig.add_trace(
+                            go.Scatter(
+                                x=inside_pareto_df[var_x],
+                                y=inside_pareto_df[var_y],
+                                mode="markers",
+                                marker=dict(
+                                    size=10,
+                                    symbol=MARKER_SYMBOLS["pareto"],
+                                    color=MARKER_COLORS["pareto"],
+                                    line=dict(width=2, color="black"),
+                                ),
+                                hovertemplate="<b>Pareto Point</b><extra></extra>",
+                                name=MARKER_NAMES["pareto"],
+                                showlegend=True,
                             ),
-                            hovertemplate="<b>Pareto Point</b><extra></extra>",
-                            name="Pareto Front",
-                            showlegend=True,
-                        ),
-                        row=1,
-                        col=col,
-                    )
+                            row=1,
+                            col=col,
+                        )
+
+                    # Add outside bounds pareto points (discarded)
+                    if pareto_outside_bounds:
+                        outside_pareto_df = pareto_df.loc[pareto_outside_bounds]
+                        fig.add_trace(
+                            go.Scatter(
+                                x=outside_pareto_df[var_x],
+                                y=outside_pareto_df[var_y],
+                                mode="markers",
+                                marker=dict(
+                                    size=10,
+                                    symbol=MARKER_SYMBOLS["pareto"],
+                                    color=MARKER_COLORS["discarded"],
+                                    line=dict(width=2, color="black"),
+                                ),
+                                hovertemplate="<b>Pareto Point (Excluded)</b><extra></extra>",
+                                name=MARKER_NAMES["discarded"],
+                                showlegend=True,
+                            ),
+                            row=1,
+                            col=col,
+                        )
 
                     clicked_indices_gp = (
                         clicked_points.get("pareto-front", [])
@@ -493,12 +621,12 @@ def _regenerate_gp_predictions_figures(
                                     mode="markers",
                                     marker=dict(
                                         size=12,
-                                        symbol="x",
-                                        color="#FFB000",
+                                        symbol=MARKER_SYMBOLS["selected"],
+                                        color=MARKER_COLORS["selected"],
                                         line=dict(width=2, color="black"),
                                     ),
                                     hovertemplate="<b>Selected Pareto Point</b><extra></extra>",
-                                    name="Selected Pareto Point",
+                                    name=MARKER_NAMES["selected"],
                                     showlegend=True,
                                 ),
                                 row=1,
@@ -526,12 +654,12 @@ def _regenerate_gp_predictions_figures(
                                     mode="markers",
                                     marker=dict(
                                         size=12,
-                                        symbol="diamond",
-                                        color="#FFA500",
+                                        symbol=MARKER_SYMBOLS["auto_selected"],
+                                        color=MARKER_COLORS["auto_selected"],
                                         line=dict(width=2, color="black"),
                                     ),
                                     hovertemplate="<b>Auto Selection</b><extra></extra>",
-                                    name="Auto Selection",
+                                    name=MARKER_NAMES["auto_selected"],
                                     showlegend=True,
                                 ),
                                 row=1,
@@ -568,7 +696,7 @@ def _regenerate_gp_predictions_figures(
                 hovermode="closest",
                 title_text=f"GP Prediction: {pred_label}",
                 legend=dict(
-                    orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.2
+                    orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.35
                 ),
             )
             figures.append(fig)
@@ -608,12 +736,13 @@ def _export_investigation_space_csv(
 
 
 def _export_optimization_problem_csv(
-    mlflow_run: str, objective_renames: dict[str, str] | None = None
+    mlflow_run: str,
+    objective_renames: dict[str, str] | None = None,
+    pareto_mode: str = "Optimization",
 ) -> str | None:
     """Export optimization problem objectives as CSV string."""
     try:
-        path = Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/optimization_problem.json")
-        opt_problem = OptimizationProblem.from_json(path)
+        opt_problem = load_optimization_problem(mlflow_run, pareto_mode)
         renames = objective_renames or {}
 
         rows = []
@@ -704,6 +833,7 @@ def _export_pareto_front_csv(
     State("measurement-renames-store", "data"),
     State("parcoords-columns-checklist", "value"),
     State("parcoords-visibility-checklist", "value"),
+    State("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
 def download_current_plots(
@@ -716,9 +846,10 @@ def download_current_plots(
     objective_renames: dict[str, str],
     investigation_space_renames: dict[str, str],
     measurement_renames: dict[str, str],
-    selected_columns: list[str] | None,
-    visibility_options: list[str] | None,
-):
+    selected_parcoords_columns: list[str] | None,
+    parcoords_visibility: list[str] | None,
+    pareto_mode: str,
+) -> dict[str, str] | Any:
     """Download the current figures as a zip archive of PNGs with current state and renames."""
     if n_clicks is None:
         return no_update
@@ -757,6 +888,7 @@ def download_current_plots(
             objective_renames or {},
             investigation_space_renames or {},
             measurement_renames or {},
+            pareto_mode,
         )
         figures.append(("pareto-front", pareto_figure))
 
@@ -779,8 +911,9 @@ def download_current_plots(
             objective_renames or {},
             investigation_space_renames or {},
             measurement_renames or {},
-            selected_columns or [],
-            visibility_options or [],
+            selected_parcoords_columns or [],
+            parcoords_visibility or [],
+            pareto_mode,
         )
         figures.append(("pareto-front-parcoords", pareto_parcoords_figure))
 
@@ -793,7 +926,19 @@ def download_current_plots(
             buffer, mode="w", compression=zipfile.ZIP_DEFLATED
         ) as archive:
             for prefix, figure in figures:
-                width, height = _export_dimensions(figure)
+                # Determine plot type from prefix
+                if "experiment-results" in prefix and "parcoords" not in prefix:
+                    plot_type = "experiment-results"
+                elif "gp-predictions" in prefix:
+                    plot_type = "gp-predictions"
+                elif "pareto-front" in prefix and "parcoords" not in prefix:
+                    plot_type = "pareto-front"
+                else:
+                    plot_type = "default"
+
+                width, height = _export_dimensions(figure, plot_type)
+                # Update figure layout with export dimensions
+                figure.update_layout(width=width, height=height)
 
                 if not use_html_fallback:
                     try:
@@ -826,7 +971,7 @@ def download_current_plots(
                     archive.writestr("investigation_space.csv", investigation_space_csv)
 
                 opt_problem_csv = _export_optimization_problem_csv(
-                    mlflow_run, objective_renames
+                    mlflow_run, objective_renames, pareto_mode
                 )
                 if opt_problem_csv:
                     archive.writestr("optimization_problem.csv", opt_problem_csv)

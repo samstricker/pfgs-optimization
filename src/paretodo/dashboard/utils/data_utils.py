@@ -14,9 +14,29 @@ def load_investigation_space(mlflow_run: str) -> InvestigationSpace:
     return InvestigationSpace.from_json(path)
 
 
-def load_optimization_problem(mlflow_run: str) -> OptimizationProblem:
-    """Load optimization problem from JSON file."""
-    path = Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/optimization_problem.json")
+def load_optimization_problem(
+    mlflow_run: str, mode: str = "Optimization"
+) -> OptimizationProblem:
+    """Load optimization problem from JSON file.
+
+    Parameters
+    ----------
+    mlflow_run : str
+        The MLflow run name.
+    mode : str, optional
+        The mode to load ('Optimization' or 'Manufacturing'). Default is 'Optimization'.
+
+    Returns
+    -------
+    OptimizationProblem
+        Optimization problem loaded from the appropriate JSON file.
+    """
+    filename = (
+        "manufacturing_optimization_problem.json"
+        if mode == "Manufacturing"
+        else "optimization_problem.json"
+    )
+    path = Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/{filename}")
     return OptimizationProblem.from_json(path)
 
 
@@ -36,6 +56,32 @@ def load_meshgrid_df(mlflow_run: str, iteration: str) -> pd.DataFrame:
     """Load meshgrid predictions data from CSV file."""
     csv_path = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/meshgrid_predictions.csv"
     return pd.read_csv(csv_path)
+
+
+def load_manufacturing_df(mlflow_run: str, iteration: str) -> pd.DataFrame:
+    """Load manufacturing Pareto front data from CSV file.
+
+    Parameters
+    ----------
+    mlflow_run : str
+        The MLflow run name.
+    iteration : str
+        The iteration name.
+
+    Returns
+    -------
+    pd.DataFrame
+        Manufacturing Pareto front data loaded from CSV file.
+        Returns empty dataframe if file doesn't exist.
+    """
+    csv_path = (
+        f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/manufacturing_front_predictions.csv"
+    )
+    try:
+        return pd.read_csv(csv_path)
+    except FileNotFoundError:
+        # Return empty dataframe if manufacturing file doesn't exist
+        return pd.DataFrame()
 
 
 def get_measurement_columns(

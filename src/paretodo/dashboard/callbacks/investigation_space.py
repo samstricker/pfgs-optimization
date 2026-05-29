@@ -22,6 +22,7 @@ from ..utils.types_and_constants import (
     RenamesDict,
 )
 from ..theme.plotly_theme import get_theme
+from ..utils.data_utils import load_manufacturing_df, load_optimization_problem
 
 
 @app.callback(
@@ -34,6 +35,7 @@ from ..theme.plotly_theme import get_theme
     Input("measurement-renames-store", "data"),
     Input("objective-renames-store", "data"),
     Input("objectives-bounds-store", "data"),
+    Input("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
 def update_investigation_space_plots(
@@ -45,6 +47,7 @@ def update_investigation_space_plots(
     measurement_renames: RenamesDict,
     objective_renames: dict[str, str],
     objectives_bounds: dict | None,
+    pareto_mode: str,
 ) -> go.Figure:
     """Create x-y scatter plots for investigation space dimensions using subplots.
 
@@ -67,16 +70,26 @@ def update_investigation_space_plots(
         experiments_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/experiments.csv"
         experiments_df = pd.read_csv(experiments_csv)
 
-        # Load Pareto front data
-        pareto_csv = (
-            f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
-        )
-        pareto_df = pd.read_csv(pareto_csv)
+        # Load Pareto front data based on selected mode
+        if pareto_mode == "Manufacturing":
+            pareto_df = load_manufacturing_df(mlflow_run, iteration)
+            if pareto_df.empty:
+                # Error: Manufacturing mode selected but data not available
+                fig = go.Figure()
+                fig.update_layout(template=get_theme())
+                fig.add_annotation(
+                    text="Error: Manufacturing data (manufacturing_front_predictions.csv) not found for this iteration.",
+                    showarrow=False,
+                    font=dict(size=14, color="red"),
+                )
+                return fig
+        else:
+            pareto_df = pd.read_csv(
+                f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+            )
 
         # Load OptimizationProblem to get objective names map
-        optimization_problem_data = OptimizationProblem.from_json(
-            Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/optimization_problem.json")
-        )
+        optimization_problem_data = load_optimization_problem(mlflow_run, pareto_mode)
         objective_names_map = {}
         for idx, axis in enumerate(optimization_problem_data.problem):
             objective_names_map[idx] = axis.var_name

@@ -42,7 +42,11 @@ class MlFlowLogger:
             investigation_space.to_json(file_path=Path(temp_file_path))
             self.log_artifact(file_path=temp_file_path, artifact_path="general")
 
-    def log_optimization_problem(self, optimization_problem: OptimizationProblem):
+    def log_optimization_problem(
+        self,
+        optimization_problem: OptimizationProblem,
+        optimization_type: str = "optimization",
+    ):
         """
         Log the optimization problem to mlflow.
 
@@ -50,9 +54,15 @@ class MlFlowLogger:
         ----------
         optimization_problem : OptimizationProblem
             Optimization problem to log.
+        optimization_type : str
+            Type of the optimization problem.
         """
         with tempfile.TemporaryDirectory() as temp_dir:
-            temp_file_path = os.path.join(temp_dir, "optimization_problem.json")
+            if optimization_type.lower() == "manufacturing":
+                temp_file_name = "manufacturing_optimization_problem.json"
+            else:
+                temp_file_name = "optimization_problem.json"
+            temp_file_path = os.path.join(temp_dir, temp_file_name)
             optimization_problem.to_json(file_path=Path(temp_file_path))
             self.log_artifact(file_path=temp_file_path, artifact_path="general")
 
@@ -82,10 +92,12 @@ class MlFlowLogger:
             artifact_name = "pareto_front_predictions.csv"
         elif datatype.lower() == "selected_recipes":
             artifact_name = "selected_recipes.csv"
+        elif datatype.lower() == "manufacturing_front":
+            artifact_name = "manufacturing_front_predictions.csv"
         else:
             raise ValueError(
                 f"Unsupported datatype: {datatype}. Supported types are:"
-                "experiments, meshgrid, pareto_front, selected_recipes."
+                "experiments, meshgrid, pareto_front, selected_recipes, manufacturing_front."
             )
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_csv_path = os.path.join(temp_dir, artifact_name)

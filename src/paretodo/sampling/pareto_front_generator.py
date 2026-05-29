@@ -10,7 +10,6 @@ import numpy as np
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 from pymoo.termination.default import DefaultMultiObjectiveTermination
-from pymoo.operators.sampling.rnd import IntegerRandomSampling
 from pymoo.core.callback import Callback
 from tqdm import tqdm
 
@@ -89,7 +88,6 @@ class ParetoFrontGenerator:
         """Get the inputs for the optimization algorithm."""
         algorithm = NSGA2(
             pop_size=(self.problem.n_var * self.pop_size_per_dim),
-            sampling=IntegerRandomSampling(),
             seed=self.seed,
         )
         termination = DefaultMultiObjectiveTermination(

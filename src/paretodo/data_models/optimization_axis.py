@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 
-@dataclass(frozen=True)
+@dataclass
 class OptimizationAxis:
     """Representation of an optimization axis. One of objective to optimize."""
 
@@ -44,3 +44,13 @@ class OptimizationAxis:
                 f"Lower bound ({self.lower_bound}) must be less than upper bound "
                 f"({self.upper_bound})."
             )
+
+    def set_minimize(self, minimize: bool):
+        """Set the minimize flag for this optimization axis.
+
+        Parameters
+        ----------
+        minimize : bool
+            Whether to minimize (True) or maximize (False) this optimization axis.
+        """
+        self.minimize = minimize
