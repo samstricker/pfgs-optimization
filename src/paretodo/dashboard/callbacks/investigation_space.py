@@ -35,6 +35,7 @@ from ..utils.data_utils import load_manufacturing_df, load_optimization_problem
     Input("measurement-renames-store", "data"),
     Input("objective-renames-store", "data"),
     Input("objectives-bounds-store", "data"),
+    Input("viewport-width-store", "data"),
     Input("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
@@ -47,7 +48,8 @@ def update_investigation_space_plots(
     measurement_renames: RenamesDict,
     objective_renames: dict[str, str],
     objectives_bounds: dict | None,
-    pareto_mode: str,
+    viewport_width: int | None = None,
+    pareto_mode: str | None = None,
 ) -> go.Figure:
     """Create x-y scatter plots for investigation space dimensions using subplots.
 
@@ -99,10 +101,25 @@ def update_investigation_space_plots(
 
         # Calculate number of plots needed
         num_plots = (num_vars + 1) // 2  # Round up division
-        if num_plots < 3:
-            cols = num_plots
-        else:
-            cols = 3
+
+        def _column_count_for_viewport(viewport_w: int | None, max_columns: int) -> int:
+            """Pick the subplot column count from the current viewport width."""
+            if max_columns <= 1:
+                return 1
+
+            if not viewport_w or viewport_w <= 0:
+                return min(3, max_columns)
+
+            if viewport_w < 1100:
+                desired_columns = 1
+            elif viewport_w < 1700:
+                desired_columns = 2
+            else:
+                desired_columns = 3
+
+            return max(1, min(desired_columns, max_columns))
+
+        cols = _column_count_for_viewport(viewport_width, num_plots)
         rows = (num_plots + cols - 1) // cols  # Round up division
 
         # Create subplot figure

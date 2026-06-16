@@ -33,6 +33,7 @@ __all__ = [
     Input("clicked-points-store", "data"),
     Input("measurement-renames-store", "data"),
     Input("investigation-space-renames-store", "data"),
+    Input("viewport-width-store", "data"),
 )
 def update_experiment_results(
     mlflow_run: str,
@@ -40,6 +41,7 @@ def update_experiment_results(
     clicked_points: ClickedPointsData,
     measurement_renames: RenamesDict,
     investigation_space_renames: RenamesDict,
+    viewport_width: int | None = None,
 ):
     """Create separate scatter plots for each measurement."""
     if mlflow_run is None or iteration is None:
@@ -66,21 +68,41 @@ def update_experiment_results(
             else []
         )
 
-        num_cols = len(var_pairs)
+        num_plots = len(var_pairs)
+
+        def _column_count_for_viewport(viewport_w: int | None, max_columns: int) -> int:
+            if max_columns <= 1:
+                return 1
+            if not viewport_w or viewport_w <= 0:
+                return min(3, max_columns)
+            if viewport_w < 1100:
+                desired_columns = 1
+            elif viewport_w < 1700:
+                desired_columns = 2
+            else:
+                desired_columns = 3
+            return max(1, min(desired_columns, max_columns))
+
+        cols = _column_count_for_viewport(viewport_width, num_plots)
+        rows = (num_plots + cols - 1) // cols
+
         graph_components = []
 
         for measurement_col in measurement_cols:
             fig = make_subplots(
-                rows=1,
-                cols=num_cols,
-                specs=[[{"secondary_y": False} for _ in range(num_cols)]],
+                rows=rows,
+                cols=cols,
+                specs=[
+                    [{"secondary_y": False} for _ in range(cols)] for _ in range(rows)
+                ],
                 vertical_spacing=0.12,
                 horizontal_spacing=0.1,
             )
             fig.update_layout(template=get_theme())
 
-            for col_idx, (var_x, var_y) in enumerate(var_pairs):
-                col = col_idx + 1
+            for plot_idx, (var_x, var_y) in enumerate(var_pairs):
+                row = plot_idx // cols + 1
+                col = plot_idx % cols + 1
 
                 if (
                     var_x not in experiments_df.columns
@@ -97,8 +119,8 @@ def update_experiment_results(
                             size=8,
                             symbol="square",
                             color=experiments_df[measurement_col],
-                            colorscale="Viridis",
-                            showscale=(col_idx == 0),
+                            # colorscale="Viridis",
+                            showscale=(col == 1),
                             line=dict(width=0.5, color="DarkSlateGrey"),
                         ),
                         customdata=[[idx] for idx in experiments_df.index],  # type: ignore
@@ -113,7 +135,7 @@ def update_experiment_results(
                         ),
                         showlegend=False,
                     ),
-                    row=1,
+                    row=row,
                     col=col,
                 )
 
@@ -139,24 +161,24 @@ def update_experiment_results(
                             showlegend=False,
                             hoverinfo="skip",
                         ),
-                        row=1,
+                        row=row,
                         col=col,
                     )
 
                 fig.update_xaxes(
                     title_text=get_display_name(var_x, investigation_space_renames),
-                    row=1,
+                    row=row,
                     col=col,
                 )
                 fig.update_yaxes(
                     title_text=get_display_name(var_y, investigation_space_renames),
-                    row=1,
+                    row=row,
                     col=col,
                 )
 
             width, height = get_square_plot_dimensions(
-                columns=num_cols,
-                rows=1,
+                columns=cols,
+                rows=rows,
                 horizontal_spacing=0.1,
             )
             fig.update_layout(
@@ -197,6 +219,7 @@ def update_experiment_results(
     Input("clicked-points-store", "data"),
     Input("measurement-renames-store", "data"),
     Input("investigation-space-renames-store", "data"),
+    Input("viewport-width-store", "data"),
     prevent_initial_call=True,
 )
 def store_experiment_results_figures(
@@ -205,6 +228,7 @@ def store_experiment_results_figures(
     clicked_points: ClickedPointsData,
     _measurement_renames: RenamesDict,
     _investigation_space_renames: RenamesDict,
+    viewport_width: int | None = None,
 ) -> list[dict]:
     """Store experiment result figures for download."""
     if mlflow_run is None or iteration is None:
@@ -232,20 +256,40 @@ def store_experiment_results_figures(
         )
 
         figures = []
-        num_cols = len(var_pairs)
+        num_plots = len(var_pairs)
+
+        def _column_count_for_viewport(viewport_w: int | None, max_columns: int) -> int:
+            if max_columns <= 1:
+                return 1
+            if not viewport_w or viewport_w <= 0:
+                return min(3, max_columns)
+            if viewport_w < 1100:
+                desired_columns = 1
+            elif viewport_w < 1700:
+                desired_columns = 2
+            else:
+                desired_columns = 3
+            return max(1, min(desired_columns, max_columns))
+
+        cols = _column_count_for_viewport(viewport_width, num_plots)
+        rows = (num_plots + cols - 1) // cols
 
         for measurement_col in measurement_cols:
             fig = make_subplots(
-                rows=1,
-                cols=num_cols,
-                specs=[[{"secondary_y": False} for _ in range(num_cols)]],
+                rows=rows,
+                cols=cols,
+                specs=[
+                    [{"secondary_y": False} for _ in range(cols)] for _ in range(rows)
+                ],
                 vertical_spacing=0.12,
                 horizontal_spacing=0.1,
             )
             fig.update_layout(template=get_theme())
 
-            for col_idx, (var_x, var_y) in enumerate(var_pairs):
-                col = col_idx + 1
+            for plot_idx, (var_x, var_y) in enumerate(var_pairs):
+                row = plot_idx // cols + 1
+                col = plot_idx % cols + 1
+
                 if (
                     var_x not in experiments_df.columns
                     or var_y not in experiments_df.columns
@@ -261,13 +305,13 @@ def store_experiment_results_figures(
                             size=8,
                             symbol="square",
                             color=experiments_df[measurement_col],
-                            colorscale="Viridis",
-                            showscale=(col_idx == 0),
+                            # colorscale="Viridis",
+                            showscale=(col == 1),
                             line=dict(width=0.5, color="DarkSlateGrey"),
                         ),
                         showlegend=False,
                     ),
-                    row=1,
+                    row=row,
                     col=col,
                 )
 
@@ -292,16 +336,16 @@ def store_experiment_results_figures(
                             showlegend=False,
                             hoverinfo="skip",
                         ),
-                        row=1,
+                        row=row,
                         col=col,
                     )
 
-                fig.update_xaxes(title_text=var_x, row=1, col=col)
-                fig.update_yaxes(title_text=var_y, row=1, col=col)
+                fig.update_xaxes(title_text=var_x, row=row, col=col)
+                fig.update_yaxes(title_text=var_y, row=row, col=col)
 
             width, height = get_square_plot_dimensions(
-                columns=num_cols,
-                rows=1,
+                columns=cols,
+                rows=rows,
                 horizontal_spacing=0.1,
             )
             fig.update_layout(
@@ -397,45 +441,25 @@ def update_experiment_results_parcoords(
             return fig
 
         # Create color array for selected vs non-selected points
-        colors = []
-        for idx in range(len(experiments_df)):
-            if idx in selected_indices:
-                colors.append(MARKER_COLORS["highlight"])
-            else:
-                colors.append(MARKER_COLORS["pareto"])
+        colors_numeric = [
+            1 if i in selected_indices else 0 for i in experiments_df.index
+        ]
 
-        # Create parallel coordinates plot
-        fig = go.Figure(
-            data=go.Parcoords(
-                dimensions=dimensions,
-                line=dict(
-                    color=colors,
-                    colorscale=None,
-                    showscale=False,
-                ),
-                labelangle=-45,
-                labelside="bottom",
-            )
+        # Build parcoords trace
+        parcoords_trace = go.Parcoords(
+            dimensions=dimensions,
+            line=dict(
+                color=colors_numeric,
+                colorscale=[[0, "lightgray"], [1, MARKER_COLORS["highlight"]]],
+                showscale=False,
+            ),
         )
 
-        fig.update_layout(
-            template=get_theme(),
-            height=700,
-            title="Experiment Results - Parallel Coordinates",
-            font=dict(size=12),
-            margin=dict(l=80, r=40, b=150),
-        )
-
-        return fig
-
-    except FileNotFoundError as e:
-        fig = go.Figure()
-        fig.update_layout(template=get_theme())
-        fig.add_annotation(text=f"Data not found: {e}")
+        fig = go.Figure(parcoords_trace)
+        fig.update_layout(template=get_theme(), height=600)
         return fig
     except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error creating experiment results parallel coordinates: {e}")
         fig = go.Figure()
         fig.update_layout(template=get_theme())
-        fig.add_annotation(text=f"Error: {e}")
+        fig.add_annotation(text=f"Error loading data: {e}")
         return fig

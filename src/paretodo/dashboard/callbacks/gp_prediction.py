@@ -223,6 +223,7 @@ def _split_pareto_points_by_bounds(
     Input("robustness-pareto-point", "value"),
     Input("alternative-expected-error-store", "data"),
     Input("gp-show-reference-point", "value"),
+    Input("viewport-width-store", "data"),
     Input("pareto-mode-store", "data"),
     prevent_initial_call=True,
 )
@@ -239,7 +240,8 @@ def update_gp_predictions(
     robustness_pareto_point: int | None,
     alternative_expected_errors: dict[str, float] | None,
     show_reference_point: list[str] | None,
-    pareto_mode: str,
+    viewport_width: int | None = None,
+    pareto_mode: str | None = None,
 ) -> list[html.Div]:
     """Create contour plots for each GP prediction using variable pair layout."""
     if mlflow_run is None or iteration is None:
@@ -307,6 +309,22 @@ def update_gp_predictions(
 
         num_cols = len(var_pairs)
 
+        def _column_count_for_viewport(viewport_w: int | None, max_columns: int) -> int:
+            if max_columns <= 1:
+                return 1
+            if not viewport_w or viewport_w <= 0:
+                return min(3, max_columns)
+            if viewport_w < 1100:
+                desired_columns = 1
+            elif viewport_w < 1700:
+                desired_columns = 2
+            else:
+                desired_columns = 3
+            return max(1, min(desired_columns, max_columns))
+
+        cols = _column_count_for_viewport(viewport_width, num_cols)
+        rows = (num_cols + cols - 1) // cols
+
         # Create mapping of variable names to their selected filter values
         var_to_filter = {}
         if filter_values and len(filter_values) == len(var_names):
@@ -324,11 +342,13 @@ def update_gp_predictions(
                 prediction_col_ranges[pred_col] = (pred_min, pred_max)
 
         for prediction_col in prediction_cols:
-            # Create subplots for this prediction: 1 row, multiple columns
+            # Create subplots for this prediction: multiple rows/cols based on viewport
             fig = make_subplots(
-                rows=1,
-                cols=num_cols,
-                specs=[[{"secondary_y": False} for _ in range(num_cols)]],
+                rows=rows,
+                cols=cols,
+                specs=[
+                    [{"secondary_y": False} for _ in range(cols)] for _ in range(rows)
+                ],
                 horizontal_spacing=0.12,
             )
             fig.update_layout(template=get_theme())
@@ -345,7 +365,9 @@ def update_gp_predictions(
                         filter_val = var_to_filter[var_name]
                         filtered_df = filtered_df[filtered_df[var_name] == filter_val]
 
-                col = col_idx + 1
+                plot_idx = col_idx
+                row = plot_idx // cols + 1
+                col = plot_idx % cols + 1
 
                 if var_x not in filtered_df.columns or var_y not in filtered_df.columns:
                     continue
@@ -353,7 +375,7 @@ def update_gp_predictions(
                 if prediction_col not in filtered_df.columns:
                     continue
 
-                show_colorbar = col_idx == 0
+                show_colorbar = col == 1
 
                 try:
                     # Create contour plot data
@@ -402,7 +424,7 @@ def update_gp_predictions(
                             z=z_grid,
                             x=unique_x,
                             y=unique_y,
-                            colorscale="Viridis",
+                            # colorscale="Viridis",
                             showscale=show_colorbar,
                             zmin=z_min,
                             zmax=z_max,
@@ -416,7 +438,7 @@ def update_gp_predictions(
                             name=f"Mean {z_label}",
                             showlegend=True,
                         ),
-                        row=1,
+                        row=row,
                         col=col,
                     )
 
@@ -506,7 +528,7 @@ def update_gp_predictions(
                                     hovertemplate="<b>Experiment</b><extra></extra>",
                                     showlegend=True,
                                 ),
-                                row=1,
+                                row=row,
                                 col=col,
                             )
 
@@ -528,7 +550,7 @@ def update_gp_predictions(
                                     hovertemplate="<b>Experiment (Excluded)</b><extra></extra>",
                                     showlegend=True,
                                 ),
-                                row=1,
+                                row=row,
                                 col=col,
                             )
 
@@ -576,7 +598,7 @@ def update_gp_predictions(
                                     name="Selected Experiment",
                                     showlegend=True,
                                 ),
-                                row=1,
+                                row=row,
                                 col=col,
                             )
 
@@ -599,9 +621,9 @@ def update_gp_predictions(
                                 ),
                                 hovertemplate="<b>Pareto Point</b><extra></extra>",
                                 name=MARKER_NAMES["pareto"],
-                                showlegend=(col_idx == 0),
+                                showlegend=(plot_idx == 0),
                             ),
-                            row=1,
+                            row=row,
                             col=col,
                         )
 
@@ -620,9 +642,9 @@ def update_gp_predictions(
                                 ),
                                 hovertemplate="<b>Pareto Point (Excluded)</b><extra></extra>",
                                 name=MARKER_NAMES["discarded"],
-                                showlegend=(col_idx == 0),
+                                showlegend=(plot_idx == 0),
                             ),
-                            row=1,
+                            row=row,
                             col=col,
                         )
 
@@ -671,7 +693,7 @@ def update_gp_predictions(
                                     name="Selected Pareto Point",
                                     showlegend=True,
                                 ),
-                                row=1,
+                                row=row,
                                 col=col,
                             )
 
@@ -713,7 +735,7 @@ def update_gp_predictions(
                                     name="Auto Selection",
                                     showlegend=True,
                                 ),
-                                row=1,
+                                row=row,
                                 col=col,
                             )
 
@@ -781,7 +803,7 @@ def update_gp_predictions(
                                     name="Reference",
                                     showlegend=False,
                                 ),
-                                row=1,
+                                row=row,
                                 col=col,
                             )
 
@@ -866,7 +888,7 @@ def update_gp_predictions(
                                         fill="toself",
                                         fillcolor="rgba(255,0,0,0.05)",
                                     ),
-                                    row=1,
+                                    row=row,
                                     col=col,
                                 )
 
@@ -924,7 +946,7 @@ def update_gp_predictions(
                                                 fill="toself",
                                                 fillcolor="rgba(0,255,0,0.05)",
                                             ),
-                                            row=1,
+                                            row=row,
                                             col=col,
                                         )
                         except (KeyError, AttributeError, ValueError):
@@ -953,13 +975,13 @@ def update_gp_predictions(
 
                 fig.update_xaxes(
                     title_text=display_var_x,
-                    row=1,
+                    row=row,
                     col=col,
                     range=[x_min, x_max],
                 )
                 fig.update_yaxes(
                     title_text=display_var_y,
-                    row=1,
+                    row=row,
                     col=col,
                     range=[y_min, y_max],
                 )
@@ -970,8 +992,8 @@ def update_gp_predictions(
                 else measurement_renames.get(prediction_col, prediction_col)
             )
             width, height = get_square_plot_dimensions(
-                columns=num_cols,
-                rows=1,
+                columns=cols,
+                rows=rows,
                 horizontal_spacing=0.12,
                 right_margin=GP_PREDICTION_RIGHT_MARGIN,
             )
@@ -1022,6 +1044,7 @@ def update_gp_predictions(
     Input("robustness-confidence-level", "value"),
     Input("robustness-pareto-point", "value"),
     Input("alternative-expected-error-store", "data"),
+    Input("viewport-width-store", "data"),
     prevent_initial_call=True,
 )
 def store_gp_predictions_figures(
@@ -1034,6 +1057,7 @@ def store_gp_predictions_figures(
     robustness_confidence_level: int | None,
     robustness_pareto_point: int | None,
     alternative_expected_errors: dict | None,
+    viewport_width: int | None = None,
 ) -> list[dict]:
     """Store GP prediction figures for download."""
     if mlflow_run is None or iteration is None:
@@ -1082,6 +1106,22 @@ def store_gp_predictions_figures(
             return []
 
         num_cols = len(var_pairs)
+
+        def _column_count_for_viewport(viewport_w: int | None, max_columns: int) -> int:
+            if max_columns <= 1:
+                return 1
+            if not viewport_w or viewport_w <= 0:
+                return min(3, max_columns)
+            if viewport_w < 1100:
+                desired_columns = 1
+            elif viewport_w < 1700:
+                desired_columns = 2
+            else:
+                desired_columns = 3
+            return max(1, min(desired_columns, max_columns))
+
+        cols = _column_count_for_viewport(viewport_width, num_cols)
+        rows = (num_cols + cols - 1) // cols
         var_to_filter = {}
         if filter_values and len(filter_values) == len(var_names):
             var_to_filter = dict(zip(var_names, filter_values))
@@ -1096,9 +1136,11 @@ def store_gp_predictions_figures(
 
         for prediction_col in prediction_cols:
             fig = make_subplots(
-                rows=1,
-                cols=num_cols,
-                specs=[[{"secondary_y": False} for _ in range(num_cols)]],
+                rows=rows,
+                cols=cols,
+                specs=[
+                    [{"secondary_y": False} for _ in range(cols)] for _ in range(rows)
+                ],
                 horizontal_spacing=0.12,
             )
             fig.update_layout(template=get_theme())
@@ -1111,13 +1153,15 @@ def store_gp_predictions_figures(
                         filter_val = var_to_filter[var_name]
                         filtered_df = filtered_df[filtered_df[var_name] == filter_val]
 
-                col = col_idx + 1
+                plot_idx = col_idx
+                row = plot_idx // cols + 1
+                col = plot_idx % cols + 1
                 if var_x not in filtered_df.columns or var_y not in filtered_df.columns:
                     continue
                 if prediction_col not in filtered_df.columns:
                     continue
 
-                show_colorbar = col_idx == 0
+                show_colorbar = col == 1
                 try:
                     x_vals = np.asarray(filtered_df[var_x], dtype=np.float64)
                     y_vals = np.asarray(filtered_df[var_y], dtype=np.float64)
@@ -1160,7 +1204,7 @@ def store_gp_predictions_figures(
                             z=z_grid,
                             x=unique_x,
                             y=unique_y,
-                            colorscale="Viridis",
+                            # colorscale="Viridis",
                             showscale=show_colorbar,
                             zmin=z_min,
                             zmax=z_max,
@@ -1174,7 +1218,7 @@ def store_gp_predictions_figures(
                             name=f"Mean {z_label}",
                             showlegend=True,
                         ),
-                        row=1,
+                        row=row,
                         col=col,
                     )
 
@@ -1258,7 +1302,7 @@ def store_gp_predictions_figures(
                                     showlegend=False,
                                     hoverinfo="skip",
                                 ),
-                                row=1,
+                                row=row,
                                 col=col,
                             )
 
@@ -1277,7 +1321,7 @@ def store_gp_predictions_figures(
                                     showlegend=False,
                                     hoverinfo="skip",
                                 ),
-                                row=1,
+                                row=row,
                                 col=col,
                             )
 
@@ -1361,7 +1405,7 @@ def store_gp_predictions_figures(
                                     showlegend=True,
                                     hoverinfo="skip",
                                 ),
-                                row=1,
+                                row=row,
                                 col=col,
                             )
 
@@ -1381,7 +1425,7 @@ def store_gp_predictions_figures(
                                     showlegend=True,
                                     hoverinfo="skip",
                                 ),
-                                row=1,
+                                row=row,
                                 col=col,
                             )
 
@@ -1454,7 +1498,7 @@ def store_gp_predictions_figures(
                                         fill="toself",
                                         fillcolor="rgba(255,0,0,0.05)",
                                     ),
-                                    row=1,
+                                    row=row,
                                     col=col,
                                 )
 
@@ -1507,7 +1551,7 @@ def store_gp_predictions_figures(
                                                 fill="toself",
                                                 fillcolor="rgba(0,255,0,0.05)",
                                             ),
-                                            row=1,
+                                            row=row,
                                             col=col,
                                         )
 
@@ -1522,13 +1566,13 @@ def store_gp_predictions_figures(
 
                     fig.update_xaxes(
                         title_text=x_label,
-                        row=1,
+                        row=row,
                         col=col,
                         range=[x_min, x_max],
                     )
                     fig.update_yaxes(
                         title_text=y_label,
-                        row=1,
+                        row=row,
                         col=col,
                         range=[y_min, y_max],
                     )
@@ -1542,8 +1586,8 @@ def store_gp_predictions_figures(
                 else measurement_renames.get(prediction_col, prediction_col)
             )
             width, height = get_square_plot_dimensions(
-                columns=num_cols,
-                rows=1,
+                columns=cols,
+                rows=rows,
                 horizontal_spacing=0.12,
                 right_margin=GP_PREDICTION_RIGHT_MARGIN,
             )

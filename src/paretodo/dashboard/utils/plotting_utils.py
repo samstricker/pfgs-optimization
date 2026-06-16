@@ -103,7 +103,7 @@ def add_contour_trace(
     x_data: np.ndarray,
     y_data: np.ndarray,
     z_data: np.ndarray,
-    colorscale: str = "Viridis",
+    colorscale: str = "ReBu",
     show_colorbar: bool = True,
     _color_title: str = "",
     row: int = 1,

@@ -190,7 +190,7 @@ def _regenerate_experiment_results_figures(
                             size=8,
                             symbol="square",
                             color=experiments_df[measurement_col],
-                            colorscale="Viridis",
+                            # colorscale="Viridis",
                             showscale=(col_idx == 0),
                             line=dict(width=0.5, color="DarkSlateGrey"),
                         ),
@@ -389,7 +389,7 @@ def _regenerate_gp_predictions_figures(
                             z=z_grid,
                             x=unique_x,
                             y=unique_y,
-                            colorscale="Viridis",
+                            # colorscale="Viridis",
                             showscale=show_colorbar,
                             zmin=z_min,
                             zmax=z_max,
@@ -1048,27 +1048,27 @@ def download_current_plots(
         )
         figures.append(("investigation-space", investigation_space_figure))
 
-        gp_figures = []
-        if gp_prediction_figures_store:
-            gp_figures = [
-                _figure_from_store(figure_data)
-                for figure_data in gp_prediction_figures_store
-            ]
+        # Always regenerate GP prediction figures with current selection state
+        # so that selected/pinned points are included in the exported plots.
+        gp_figures = _regenerate_gp_predictions_figures(
+            mlflow_run,
+            iteration,
+            clicked_points,
+            pinned_points,
+            measurement_renames,
+            investigation_space_renames,
+            objectives_bounds,
+            pareto_mode,
+            robustness_confidence_level,
+            robustness_pareto_point,
+            alternative_expected_errors,
+        )
 
-        if not gp_figures:
-            gp_figures = _regenerate_gp_predictions_figures(
-                mlflow_run,
-                iteration,
-                clicked_points,
-                pinned_points,
-                measurement_renames,
-                investigation_space_renames,
-                objectives_bounds,
-                pareto_mode,
-                robustness_confidence_level,
-                robustness_pareto_point,
-                alternative_expected_errors,
-            )
+        # Fall back to stored serialized figures only if regeneration produced no figures
+        if (not gp_figures or len(gp_figures) == 0) and gp_prediction_figures_store:
+            gp_figures = [
+                _figure_from_store(figure_data) for figure_data in gp_prediction_figures_store
+            ]
         for index, fig in enumerate(gp_figures, start=1):
             figures.append((f"gp-predictions-{index:02d}", fig))
 
