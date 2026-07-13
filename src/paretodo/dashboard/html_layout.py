@@ -417,8 +417,29 @@ def get_app_layout() -> html.Div:
                 ],
                 style={"width": "100%"},
             ),
-            dcc.Graph(
-                id="pareto-front-graph",
+            html.Div(
+                [
+                    dcc.Graph(
+                        id="pareto-front-graph",
+                        style={"width": "70%", "display": "inline-block"},
+                    ),
+                    html.Div(
+                        [
+                            html.H4("Selected molecule"),
+                            html.Img(
+                                id="molecule-preview-img",
+                                style={"maxWidth": "100%"},
+                            ),
+                            html.Div(id="molecule-preview-caption"),
+                        ],
+                        style={
+                            "width": "28%",
+                            "display": "inline-block",
+                            "verticalAlign": "top",
+                            "paddingLeft": "2%",
+                        },
+                    ),
+                ],
                 style={"width": "100%"},
             ),
             # Pareto Front Parallel Coordinates Section
