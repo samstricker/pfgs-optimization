@@ -1,0 +1,2 @@
+RecipeID,SMILES,mu,sigma,ucb,ld50_raw,ld50_standardised,selection_method
+2038,O=C(O)c1c(Cl)c(Cl)c(Cl)c(Cl)c1C(=O)Nc1cccc(Cl)c1Cl,0.6438050173412085,0.9708683558003506,2.5855417289419096,2.282000064155393,0.01655753329396248,pareto

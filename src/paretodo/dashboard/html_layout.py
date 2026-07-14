@@ -80,6 +80,40 @@ def get_app_layout() -> html.Div:
             ),
             # Download component for exporting plots and tables
             dcc.Download(id="download-plots-tables"),
+            # Structure modal (overlay for clicked molecule)
+            html.Div(
+                id="structure-modal",
+                children=[
+                    html.Div(
+                        [
+                            html.Button(
+                                "Close",
+                                id="structure-modal-close",
+                                n_clicks=0,
+                                style={"float": "right"},
+                            ),
+                            html.Img(id="structure-modal-img"),
+                        ],
+                        style={
+                            "background": "white",
+                            "padding": "20px",
+                            "borderRadius": "8px",
+                        },
+                    )
+                ],
+                style={
+                    "display": "none",
+                    "position": "fixed",
+                    "top": "0",
+                    "left": "0",
+                    "width": "100%",
+                    "height": "100%",
+                    "background": "rgba(0,0,0,0.5)",
+                    "zIndex": "1000",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                },
+            ),
             html.H1("Pareto Front Visualization (Version 2)"),
             html.Hr(style={"border": "2px solid #333", "margin": "20px 0"}),
             html.Div(
@@ -243,6 +277,10 @@ def get_app_layout() -> html.Div:
                 id="experiment-results-parcoords-graph",
                 style={"width": "100%"},
             ),
+            # Top 10 Observed Molecules Section
+            html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
+            html.H2("Top 10 Observed Molecules"),
+            html.Div(id="top-ten-table-container"),
             # GP Predictions Section
             html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
             html.H2("GP Predictions"),

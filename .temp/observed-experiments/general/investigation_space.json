@@ -1,0 +1,704 @@
+{
+    "variables": [
+        {
+            "name": "z0",
+            "min": -4.408466815948486,
+            "max": 3.892738103866577,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z1",
+            "min": -4.327797889709473,
+            "max": 2.282860517501831,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z2",
+            "min": -3.9086551666259766,
+            "max": 3.4381978511810303,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z3",
+            "min": -1.4710867404937744,
+            "max": 5.595490455627441,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z4",
+            "min": -3.3051722049713135,
+            "max": 7.1013264656066895,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z5",
+            "min": -2.5714547634124756,
+            "max": 4.494963645935059,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z6",
+            "min": -3.7810614109039307,
+            "max": 4.082753658294678,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z7",
+            "min": -5.210815906524658,
+            "max": 6.124048709869385,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z8",
+            "min": -4.031665802001953,
+            "max": 3.042846918106079,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z9",
+            "min": -2.181532621383667,
+            "max": 4.696437358856201,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z10",
+            "min": -4.623745918273926,
+            "max": 2.8657844066619873,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z11",
+            "min": -3.587324619293213,
+            "max": 3.077841281890869,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z12",
+            "min": -1.973715901374817,
+            "max": 4.6466217041015625,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z13",
+            "min": -7.411809921264648,
+            "max": 2.0786936283111572,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z14",
+            "min": -2.241901397705078,
+            "max": 4.559901237487793,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z15",
+            "min": -2.762080669403076,
+            "max": 4.894650936126709,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z16",
+            "min": -3.722400665283203,
+            "max": 3.311643362045288,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z17",
+            "min": -3.1912362575531006,
+            "max": 4.466545104980469,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z18",
+            "min": -2.3842599391937256,
+            "max": 3.680920124053955,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z19",
+            "min": -3.2129154205322266,
+            "max": 5.06522274017334,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z20",
+            "min": -3.8691234588623047,
+            "max": 2.1145284175872803,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z21",
+            "min": -3.536691665649414,
+            "max": 3.7701330184936523,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z22",
+            "min": -5.127972602844238,
+            "max": 3.3821868896484375,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z23",
+            "min": -4.4861884117126465,
+            "max": 2.284022569656372,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z24",
+            "min": -3.9828317165374756,
+            "max": 1.9342416524887085,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z25",
+            "min": -1.128684639930725,
+            "max": 5.297793388366699,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z26",
+            "min": -3.609227180480957,
+            "max": 4.24889612197876,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z27",
+            "min": -1.6623090505599976,
+            "max": 5.699814319610596,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z28",
+            "min": -2.767157793045044,
+            "max": 2.963157892227173,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z29",
+            "min": -1.640473484992981,
+            "max": 4.004175186157227,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z30",
+            "min": -4.316457748413086,
+            "max": 3.9558517932891846,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z31",
+            "min": -4.716724872589111,
+            "max": 3.788954734802246,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z32",
+            "min": -3.0251834392547607,
+            "max": 4.059823036193848,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z33",
+            "min": -4.822671890258789,
+            "max": 4.100710391998291,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z34",
+            "min": -4.307855606079102,
+            "max": 2.4141876697540283,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z35",
+            "min": -2.778040885925293,
+            "max": 3.5305216312408447,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z36",
+            "min": -3.6802709102630615,
+            "max": 3.3908493518829346,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z37",
+            "min": -4.633518695831299,
+            "max": 5.914836406707764,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z38",
+            "min": -4.068332195281982,
+            "max": 2.777631998062134,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z39",
+            "min": -5.060177326202393,
+            "max": 4.949042797088623,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z40",
+            "min": -4.2164387702941895,
+            "max": 1.7779701948165894,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z41",
+            "min": -3.159320116043091,
+            "max": 5.9582061767578125,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z42",
+            "min": -5.6123366355896,
+            "max": 2.8042538166046143,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z43",
+            "min": -2.113478422164917,
+            "max": 2.98527455329895,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z44",
+            "min": -3.7088844776153564,
+            "max": 3.844186782836914,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z45",
+            "min": -3.3061716556549072,
+            "max": 3.242281675338745,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z46",
+            "min": -2.964261293411255,
+            "max": 3.8095343112945557,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z47",
+            "min": -1.4807010889053345,
+            "max": 2.9492220878601074,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z48",
+            "min": -3.3045175075531006,
+            "max": 3.9398131370544434,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z49",
+            "min": -4.562520503997803,
+            "max": 3.5724124908447266,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z50",
+            "min": -5.105518341064453,
+            "max": 3.968292236328125,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z51",
+            "min": -5.004683494567871,
+            "max": 3.152311086654663,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z52",
+            "min": -4.107081413269043,
+            "max": 2.254103422164917,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z53",
+            "min": -5.968326568603516,
+            "max": 2.646960973739624,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z54",
+            "min": -4.408146381378174,
+            "max": 2.4825572967529297,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z55",
+            "min": -3.3600172996520996,
+            "max": 5.214094161987305,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z56",
+            "min": -3.3606512546539307,
+            "max": 3.5141263008117676,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z57",
+            "min": -3.693701982498169,
+            "max": 3.4358296394348145,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z58",
+            "min": -7.419544219970703,
+            "max": 2.2562077045440674,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z59",
+            "min": -3.638855218887329,
+            "max": 3.103771448135376,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z60",
+            "min": -3.0447356700897217,
+            "max": 5.025039196014404,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z61",
+            "min": -3.5955069065093994,
+            "max": 5.187918186187744,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z62",
+            "min": -4.383866786956787,
+            "max": 3.347695827484131,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z63",
+            "min": -3.832606554031372,
+            "max": 3.8745040893554688,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z64",
+            "min": -4.532597541809082,
+            "max": 4.54889440536499,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z65",
+            "min": -3.32712721824646,
+            "max": 7.827420234680176,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z66",
+            "min": -3.4443507194519043,
+            "max": 3.821272850036621,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z67",
+            "min": -4.230398654937744,
+            "max": 7.32484769821167,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z68",
+            "min": -4.054895877838135,
+            "max": 2.1179659366607666,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z69",
+            "min": -1.8627583980560303,
+            "max": 3.950460195541382,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z70",
+            "min": -3.974017858505249,
+            "max": 1.9495021104812622,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z71",
+            "min": -2.82741641998291,
+            "max": 3.596552848815918,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z72",
+            "min": -1.6769174337387085,
+            "max": 4.416392803192139,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z73",
+            "min": -3.9504520893096924,
+            "max": 4.233553886413574,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z74",
+            "min": -4.219487190246582,
+            "max": 5.627562522888184,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z75",
+            "min": -3.2829604148864746,
+            "max": 4.214323043823242,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z76",
+            "min": -2.1795756816864014,
+            "max": 3.8308608531951904,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z77",
+            "min": -2.6866490840911865,
+            "max": 2.9859049320220947,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z78",
+            "min": -3.040729284286499,
+            "max": 4.910506725311279,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z79",
+            "min": -3.527991771697998,
+            "max": 3.8209145069122314,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z80",
+            "min": -2.0760817527770996,
+            "max": 4.848180770874023,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z81",
+            "min": -4.194143772125244,
+            "max": 3.4174675941467285,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z82",
+            "min": -5.3317461013793945,
+            "max": 6.205681800842285,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z83",
+            "min": -3.4957470893859863,
+            "max": 2.44838809967041,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z84",
+            "min": -2.3878448009490967,
+            "max": 5.512326717376709,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z85",
+            "min": -2.85107421875,
+            "max": 2.4115707874298096,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z86",
+            "min": -3.820871353149414,
+            "max": 2.5405054092407227,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z87",
+            "min": -2.651170015335083,
+            "max": 4.206604957580566,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z88",
+            "min": -3.632495641708374,
+            "max": 3.1158037185668945,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z89",
+            "min": -4.64521598815918,
+            "max": 4.5929484367370605,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z90",
+            "min": -2.7036235332489014,
+            "max": 3.469566583633423,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z91",
+            "min": -2.2973413467407227,
+            "max": 4.770924091339111,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z92",
+            "min": -2.6451966762542725,
+            "max": 2.758493661880493,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z93",
+            "min": -3.4371864795684814,
+            "max": 3.2345874309539795,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z94",
+            "min": -1.6062875986099243,
+            "max": 4.21442985534668,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z95",
+            "min": -4.641796588897705,
+            "max": 3.221130847930908,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z96",
+            "min": -3.8678183555603027,
+            "max": 4.37110710144043,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z97",
+            "min": -3.529339551925659,
+            "max": 3.9022064208984375,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z98",
+            "min": -3.7840523719787598,
+            "max": 3.8664944171905518,
+            "discretization": null,
+            "expected_error": null
+        },
+        {
+            "name": "z99",
+            "min": -4.708817005157471,
+            "max": 8.638641357421875,
+            "discretization": null,
+            "expected_error": null
+        }
+    ]
+}

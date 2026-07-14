@@ -1,0 +1,18 @@
+{
+    "problem": [
+        {
+            "var_name": "LD50",
+            "minimize": false,
+            "optimization_type": "objective",
+            "lower_bound": null,
+            "upper_bound": null
+        },
+        {
+            "var_name": "LD50",
+            "minimize": false,
+            "optimization_type": "standard_deviation",
+            "lower_bound": null,
+            "upper_bound": null
+        }
+    ]
+}
