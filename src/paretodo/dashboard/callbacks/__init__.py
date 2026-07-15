@@ -17,6 +17,7 @@ from . import (
     export_download,
     molecule_preview,
     top_ten_observed,
+    section_visibility,
 )
 from .data_loading import (
     update_mlflow_experiments_dropdown,
@@ -40,6 +41,7 @@ __all__.extend(investigation_space.__all__)
 __all__.extend(export_download.__all__)
 __all__.extend(molecule_preview.__all__)
 __all__.extend(top_ten_observed.__all__)
+__all__.extend(section_visibility.__all__)
 __all__.extend(
     [
         "update_mlflow_experiments_dropdown",

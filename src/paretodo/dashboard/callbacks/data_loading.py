@@ -19,6 +19,7 @@ from ..utils.table_components import (
     create_optimization_problem_table,
     create_measurements_table,
 )
+from ..utils.candidate_summary import get_run_mode, build_candidate_summary
 
 
 @app.callback(
@@ -252,6 +253,8 @@ def download_json_files(mlflow_port, mlflow_experiment, mlflow_run, iteration):
 @app.callback(
     Output("investigation-space-table", "children"),
     Output("optimization-problem-table", "children"),
+    Input("mlflow-port", "value"),
+    Input("mlflow-experiment", "value"),
     Input("mlflow-run", "value"),
     Input("iteration", "value"),
     Input("investigation-space-renames-store", "data"),
@@ -259,6 +262,8 @@ def download_json_files(mlflow_port, mlflow_experiment, mlflow_run, iteration):
     Input("pareto-mode-store", "data"),
 )
 def update_investigation_optimization_tables(
+    mlflow_port,
+    mlflow_experiment,
     mlflow_run,
     iteration,
     investigation_space_renames,
@@ -285,6 +290,23 @@ def update_investigation_optimization_tables(
     """
     if mlflow_run is None:
         return None, None
+
+    mode = get_run_mode(mlflow_port, mlflow_experiment, mlflow_run)
+
+    if mode == "candidate_selection":
+        investigation_panel = build_candidate_summary(
+            mlflow_port, mlflow_experiment, mlflow_run, iteration
+        )
+        try:
+            optimization_problem_data = load_optimization_problem(
+                mlflow_run, pareto_mode
+            )
+            optimization_problem = create_optimization_problem_table(
+                optimization_problem_data, mlflow_run, iteration, pareto_mode
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            optimization_problem = f"Error loading optimization problem: {e}"
+        return investigation_panel, optimization_problem
 
     try:
         investigation_space_data = InvestigationSpace.from_json(

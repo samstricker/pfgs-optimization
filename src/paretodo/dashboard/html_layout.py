@@ -264,11 +264,16 @@ def get_app_layout() -> html.Div:
                 style={"display": "flex", "width": "100%"},
             ),
             # Experiment Results Visualization Section
-            html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
-            html.H2("Experiment Results"),
             html.Div(
-                id="experiment-results-container",
-                style={"width": "100%"},
+                id="experiment-results-section",
+                children=[
+                    html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
+                    html.H2("Experiment Results"),
+                    html.Div(
+                        id="experiment-results-container",
+                        style={"width": "100%"},
+                    ),
+                ],
             ),
             # Experiment Results Parallel Coordinates Section
             html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
@@ -282,8 +287,11 @@ def get_app_layout() -> html.Div:
             html.H2("Top 10 Observed Molecules"),
             html.Div(id="top-ten-table-container"),
             # GP Predictions Section
-            html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
-            html.H2("GP Predictions"),
+            html.Div(
+                id="gp-predictions-section",
+                children=[
+                    html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
+                    html.H2("GP Predictions"),
             html.Div(
                 id="gp-filters-container",
                 style={"marginBottom": "20px"},
@@ -373,12 +381,19 @@ def get_app_layout() -> html.Div:
                 id="gp-predictions-container",
                 style={"width": "100%"},
             ),
+                ],
+            ),
             # Investigation Space Visualization Section
-            html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
-            html.H2("Investigation Space Visualization"),
-            dcc.Graph(
-                id="investigation-space-graph",
-                style={"width": "100%"},
+            html.Div(
+                id="investigation-space-viz-section",
+                children=[
+                    html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
+                    html.H2("Investigation Space Visualization"),
+                    dcc.Graph(
+                        id="investigation-space-graph",
+                        style={"width": "100%"},
+                    ),
+                ],
             ),
             # Pareto Front Visualization Section
             html.Hr(style={"border": "2px solid #333", "margin": "30px 0"}),
