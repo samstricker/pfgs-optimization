@@ -1,5 +1,6 @@
 """Table generation components for displaying data in the Pareto visualization app."""
 
+import base64
 from typing import Optional, Literal
 from dash import html, dcc
 import pandas as pd
@@ -14,6 +15,23 @@ from .types_and_constants import (
     RenamesDict,
 )
 
+def _smiles_to_png_uri(smiles: str, size=(200, 160)) -> Optional[str]:
+    """Render a SMILES string to a base64 PNG data URI, or None if invalid."""
+    try:
+        from rdkit import Chem
+        from rdkit.Chem.Draw import rdMolDraw2D
+    except ImportError:
+        return None
+
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+
+    drawer = rdMolDraw2D.MolDraw2DCairo(size[0], size[1])
+    drawer.DrawMolecule(mol)
+    drawer.FinishDrawing()
+    encoded = base64.b64encode(drawer.GetDrawingText()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 def create_table_header(headers: list[str], **kwargs: dict) -> html.Tr:
     """Create a table header row with consistent styling."""
@@ -491,6 +509,42 @@ def create_pareto_details_table(
             )
 
         table_rows.append(html.Tr(row_cells))
+
+    # Structure row: render each selected point's SMILES with RDKit
+    if "SMILES" in pareto_df.columns:
+        structure_cells = [
+            html.Td(
+                "Structure",
+                style={
+                    "border": "1px solid #bdc3c7",
+                    "padding": "12px",
+                    "fontWeight": "500",
+                    "backgroundColor": TABLE_ROW_ALT_BG,
+                },
+            )
+        ]
+
+        for label, (idx, selection_type) in points_to_show.items():
+            cell_style = {
+                "border": "1px solid #bdc3c7",
+                "padding": "12px",
+                "textAlign": "center",
+                "backgroundColor": TABLE_ROW_ALT_BG,
+            }
+
+            if idx not in pareto_df.index:
+                structure_cells.append(html.Td("N/A", style=cell_style))
+                continue
+
+            uri = _smiles_to_png_uri(str(pareto_df.loc[idx, "SMILES"]))
+            if uri is None:
+                structure_cells.append(html.Td("no render", style=cell_style))
+            else:
+                structure_cells.append(
+                    html.Td(html.Img(src=uri, style={"maxWidth": "100%"}), style=cell_style)
+                )
+
+        table_rows.append(html.Tr(structure_cells))
 
     table = html.Table(
         table_rows,
