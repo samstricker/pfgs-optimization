@@ -475,6 +475,7 @@ def get_app_layout() -> html.Div:
                     dcc.Graph(
                         id="pareto-front-graph",
                         style={"width": "70%", "display": "inline-block"},
+                        clear_on_unhover=True,
                     ),
                     html.Div(
                         [
