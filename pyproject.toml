@@ -30,8 +30,9 @@ dbiolab = { path = "../digital_biolab", editable = true }
 dev = ["black>=26.3.1", "mypy>=1.20.1", "pylint>=4.0.5", "pytest>=9.0.3"]
 
 research = [
-    "toml>=0.10.2",
-    "dbiolab>=0.1.0",
     "botorch>=0.18.1",
+    "dbiolab>=0.1.0",
+    "ipykernel>=7.3.0",
     "pydoe3>=1.6.2",
+    "toml>=0.10.2",
 ]
