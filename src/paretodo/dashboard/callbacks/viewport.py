@@ -10,7 +10,12 @@ __all__: list[str] = []
 app.clientside_callback(
     """
     function(nIntervals) {
-        return window.innerWidth || 0;
+        const width = window.innerWidth || 0;
+        if (window.__pfgsLastViewportWidth === width) {
+            return window.dash_clientside.no_update;
+        }
+        window.__pfgsLastViewportWidth = width;
+        return width;
     }
     """,
     Output("viewport-width-store", "data"),
