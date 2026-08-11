@@ -1,0 +1,18 @@
+{
+    "variables": [
+        {
+            "name": "temperature",
+            "min": 30.0,
+            "max": 40.0,
+            "discretization": 0.001,
+            "expected_error": 0.1
+        },
+        {
+            "name": "ph_value",
+            "min": 6.0,
+            "max": 8.0,
+            "discretization": 0.001,
+            "expected_error": 0.2
+        }
+    ]
+}
