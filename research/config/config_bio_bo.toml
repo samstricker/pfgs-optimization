@@ -1,0 +1,28 @@
+[parameters]
+name = "Test_NewRepo_Bio-11-08-2026"
+problem = "bio"
+algorithm = "bo"
+initial_samples = 10
+sampling_mode = "automatic"
+n_iterations = 80
+batch_size = 1
+seed = 11
+meshgrid_points_per_dim = 3
+
+[parameters.dbiolab]
+seed = 11
+objective_time = "end_of_batch"
+visualize = "false"
+reactor = "research/.local/dbiolab_defaults/MTP_1.json"
+mammalian_recipe = "research/.local/dbiolab_defaults/recipe.json"
+
+[parameters.bo_config]
+acquisition_function = "EI"
+best_f = "auto"
+num_restarts = 10
+raw_samples = 300
+
+[files]
+investigation_space = "research/.local/bio_is/is_6d.json"
+optimization_problem = "research/.local/bio_opt/bio_mean_std_r_cpurity.json"
+testsets = []

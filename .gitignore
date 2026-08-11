@@ -1,7 +1,11 @@
 # Local Data
 .python*
-.local/*
+**/.local/**
 **/__pycache__/**
 *.egg*
 build/*
 .temp/*
+uv.lock
+mlruns/*
+mlflow.db
+report.log

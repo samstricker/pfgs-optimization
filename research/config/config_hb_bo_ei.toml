@@ -1,0 +1,29 @@
+[parameters]
+name = "Test_NewRepo-11-08-2026"
+problem = "hb_butterot"
+algorithm = "bo"
+initial_samples = 10
+sampling_mode = "automatic"
+n_iterations = 18
+batch_size = 1
+seed = 11
+meshgrid_points_per_dim = 10
+rrmse_threshold = 2000
+
+[parameters.bo_config]
+acquisition_function = "EI"
+best_f = "auto"
+num_restarts = 10
+raw_samples = 100
+
+[files]
+investigation_space = "research/.local/hb_is/is.json"
+optimization_problem = "research/.local/hb_opt/hb_opt_constraint.json"
+testsets = [
+    "research/.local/hb_testsets/testset_hb_full.csv",
+    "research/.local/hb_testsets/testset_hb_full_objective.csv",
+    "research/.local/hb_testsets/testset_hb_robust_objective.csv",
+    "research/.local/hb_testsets/testset_hb_constraint.csv",
+    "research/.local/hb_testsets/testset_hb_constraint_objective.csv",
+    "research/.local/hb_testsets/testset_hb_constraint_objective_robust.csv",
+]
