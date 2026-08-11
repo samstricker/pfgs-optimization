@@ -23,7 +23,7 @@ def sample_pfgs(
     problem_type: str,
 ) -> pl.DataFrame:
 
-    if problem_type in ["himmelblau", "hb_butterot", "bio"]:
+    if problem_type in ["himmelblau", "hb_butterot", "bio", "dataset"]:
         problem = GenericProblem(
             investigation_space=investigation_space,
             dataset=model_dataset.copy(),

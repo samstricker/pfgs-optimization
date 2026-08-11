@@ -4,6 +4,16 @@ Pareto Front Guided Sampling (PFGS) is a human-in-the-loop Bayesian optimization
 
 ---
 
+## Installation
+
+```bash
+uv sync
+```
+
+Requires Python >= 3.11.
+
+---
+
 ## File Structure
 
 ```
@@ -25,13 +35,16 @@ pfgs-optimization/
 │       ├── start.py                     # Dashboard entry point
 │       ├── server.py                    # Dash/Flask server setup
 │       ├── html_layout.py               # UI layout
+│       ├── theme/                       # Plotly theme
 │       ├── callbacks/                   # Dash callback handlers
 │       └── utils/                       # Plotting helpers
+├── research/                            # Paper code + tutorial, see research/Readme.md
 ├── tests/
 │   ├── data_models/
 │   ├── sampling/                        # Includes SimpleProblem example
 │   └── selection/
-└── pyproject.toml
+├── pyproject.toml
+└── uv.lock
 ```
 
 ---
@@ -172,11 +185,7 @@ Supported `datatype` values for `log_dataframe`: `"experiments"`, `"meshgrid"`, 
 ## Starting the MLflow UI
 
 ```bash
-mlflow ui
-```
-or 
-```bash
-uv run mlflow ui 
+uv run mlflow ui
 ```
 
 Opens at [http://localhost:5000](http://localhost:5000). Run this from the project root (where `mlflow.db` is created).
@@ -185,10 +194,6 @@ Opens at [http://localhost:5000](http://localhost:5000). Run this from the proje
 
 ## Starting the Dashboard
 
-```bash
-python src/paretodo/dashboard/start.py
-```
-or
 ```bash
 uv run python -m paretodo.dashboard.start
 ```
@@ -199,11 +204,15 @@ For the contour/GP plots to work, log a `"meshgrid"` DataFrame per iteration con
 
 ---
 
+## Research
 
-## Installation
+The [`research/`](research/) folder contains the code behind the PFGS paper, plus a tutorial for trying PFGS on your own dataset — see [research/Readme.md](research/Readme.md).
 
-```bash
-pip install -e .
-```
+## Publications
 
-Requires Python >= 3.11.
+- S. Stricker et al., **“A Human-in-the-Loop Bayesian Optimization Framework for Constraint-Aware Bioprocess Development”**, Jun. 17, 2026, doi: 10.48550/arXiv.2606.19230. | [Paper](https://arxiv.org/abs/2606.19230)
+
+- S. Stricker et al., **“Pareto Front Guided Sampling for Efficient Bioprocess Experimentation”** in Systems and Control Transactions, Sheffield, United Kingdom, Jun. 2026, pp. 692–701. doi: 10.69997/sct.137011. | [Paper](https://doi.org/10.69997/sct.137011)
+
+- S. Stricker, **“Optimal Design of Experiments for Bio-Processes using Hybrid Models”**, MSc., ETH Zurich, Zurich, 2024.
+

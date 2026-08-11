@@ -1,0 +1,19 @@
+[parameters]
+iteration = 1
+problem = "dataset"
+name = "your_own_dataset"
+algorithm = "pfgs"
+seed = 11
+meshgrid_points_per_dim = 3
+
+
+[parameters.nsga2_config]
+robustness_confidence = 0.95
+pop_size_per_dim = 50
+n_max_gen = 500
+seed = 11
+
+[files]
+investigation_space = "research/00_run_your_own_dataset/.data/example_data_investigation_space.json"
+optimization_problem = "research/00_run_your_own_dataset/.data/example_data_optimization_problem.json"
+dataset = "research/00_run_your_own_dataset/.data/example_data_dataset.json"
