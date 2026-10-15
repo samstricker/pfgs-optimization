@@ -14,6 +14,21 @@ To run the experiments again, you can use the `research/scripts/run_optimization
 uv run research/scripts/run_optimization.py --config="research/config/config_bio_pfgs.toml"
 ```
 
+### Sampling modes (simulated personas)
+
+For PFGS runs (`algorithm = "pfgs"`), `sampling_mode` in the config sets how the next batch is picked from the Pareto front. The persona modes simulate different kinds of users:
+
+| `sampling_mode` | Persona | Selection |
+|---|---|---|
+| `pareto_expert` | Expert | Best *true* objective values (uses the simulator as an oracle) |
+| `pareto_noob` | Adversarial | Worst *true* objective values |
+| `pareto_explore` | Explorer | Highest predicted uncertainty (first `standard_deviation` axis) |
+| `pareto_exploit` | Exploiter | Best predicted mean (first `objective` axis) |
+| `automatic` | — | `ParetoSelector`: closest to utopia, then spread across the front |
+| `hitl` | Human | Recipes are selected manually |
+
+All persona modes first remove the regions given in `discard_values` for that iteration. The selection logic is in `helpers/sampling/selection_pfgs.py`.
+
 The results are logged to MLflow, and you can view them with:
 
 ```bash

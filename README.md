@@ -70,13 +70,16 @@ space = InvestigationSpace(variables=[
 from paretodo import OptimizationProblem, OptimizationAxis
 
 problem = OptimizationProblem(problem=[
-    OptimizationAxis(var_name="yield",      minimize=False, optimization_type="objective"),
-    OptimizationAxis(var_name="yield",      minimize=False, optimization_type="standard_deviation"),
-    OptimizationAxis(var_name="impurity",   minimize=True,  optimization_type="constraint",
+    OptimizationAxis(var_name="yield",    minimize=False, optimization_type="objective",
+                     lower_bound=None, upper_bound=None),
+    OptimizationAxis(var_name="yield",    minimize=False, optimization_type="standard_deviation",
+                     lower_bound=None, upper_bound=None),
+    OptimizationAxis(var_name="impurity", minimize=True,  optimization_type="constraint",
                      lower_bound=None, upper_bound=5.0),
-    
 ])
 ```
+
+All five fields are required; bounds must be floats or `None`.
 
 Supported `optimization_type` values:
 
@@ -102,7 +105,9 @@ class MyProblem(BaseProblem):
     def predict(self, x: NDArray[np.float64], normalized: bool = True):
         """
         Called during optimization with a batch of candidates.
-        x: shape (n_candidates, n_vars), values normalized to [0, 1]
+        x: shape (n_candidates, n_vars). During optimization normalized=True and
+           values are in [0, 1]; for robustness sampling it is called with
+           normalized=False and real (unscaled) values.
         Returns: (predictions, pl.DataFrame)
           - predictions: any structure your other methods consume
           - DataFrame: one row per candidate, columns for each output
@@ -117,12 +122,12 @@ class MyProblem(BaseProblem):
         Convert predictions into a list of objective arrays for NSGA2.
         One list entry per OptimizationAxis in your OptimizationProblem.
         Use self._get_objective_value() for standard types.
+        x_vals (real, unscaled inputs) is only used for "robustness" axes.
         """
-        
         objectives = []
         for axis in self.optimization_problem.problem:
-            obj = self._get_objective_value(axis, x_vals=None, mean=model_return_class.mean, sigma=model_return_class.sigma,
-                                            for_minimization=for_minimization)
+            obj = self._get_objective_value(axis, x_vals=model_return_class.x, mean=model_return_class.mean,
+                                            sigma=model_return_class.sigma, for_minimization=for_minimization)
             objectives.append(obj)
         return objectives
 
@@ -156,10 +161,17 @@ predictions, pareto_df = generator.generate_pareto_front()
 ```python
 from paretodo import ParetoSelector
 
-selector = ParetoSelector(pareto_df=pareto_df, optimization_problem=problem)
-selected = selector.select_recipes(n=5)
-closest  = selector.select_closest_recipe_to_utopia()
+selector = ParetoSelector()
+selected = selector.select_recipes(
+    pareto_front=pareto_df,
+    investigation_space=space,
+    optimization_problem=problem,
+    n_samples=5,
+    experiments_df=None,   # optional: past experiments to keep away from
+)
 ```
+
+The first selected recipe is the one closest to the utopia point; the rest are chosen to spread across the front.
 
 ### 6. Log Everything to MLflow
 
@@ -178,7 +190,9 @@ logger.log_metric("n_pareto_points", len(pareto_df))
 logger.end_run()
 ```
 
-Supported `datatype` values for `log_dataframe`: `"experiments"`, `"meshgrid"`, `"pareto_front"`, `"selected_recipes"`, `"manufacturing_front"`.
+Supported `datatype` values for `log_dataframe`: `"experiments"`, `"meshgrid"`, `"pareto_front"`, `"selected_recipes"`, `"manufacturing_front"`, `"pareto_convergence"`, `"manufacturing_convergence"`.
+
+`MlFlowLogger` writes to `sqlite:///mlflow.db` in the current working directory.
 
 ---
 
@@ -198,7 +212,7 @@ Opens at [http://localhost:5000](http://localhost:5000). Run this from the proje
 uv run python -m paretodo.dashboard.start
 ```
 
-Opens at [http://localhost:8055](http://localhost:8055). The dashboard loads results directly from the MLflow SQLite database (`mlflow.db`) in the project root.
+Opens at [http://localhost:8055](http://localhost:8055). The dashboard reads results through the MLflow tracking server, so start the MLflow UI first (see above). The MLflow port is set in the dashboard and defaults to 5000.
 
 For the contour/GP plots to work, log a `"meshgrid"` DataFrame per iteration containing the full prediction grid over the investigation space.
 
