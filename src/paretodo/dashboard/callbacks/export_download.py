@@ -1,6 +1,8 @@
 """Callbacks for downloading and exporting plots/data."""
 
-from io import BytesIO, StringIO
+# pylint: disable=too-many-lines
+
+from io import BytesIO
 import os
 import re
 import zipfile
@@ -14,7 +16,7 @@ import plotly.io as pio
 from dash import Input, Output, State, dcc, no_update
 from plotly.subplots import make_subplots
 
-from paretodo.data_models import InvestigationSpace, OptimizationProblem
+from paretodo.data_models import InvestigationSpace
 
 from ..server import app
 from ..utils.types_and_constants import (
@@ -240,7 +242,7 @@ def _regenerate_experiment_results_figures(
             figures.append(fig)
 
         return figures
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error regenerating experiment results figures: {e}")
         return []
 
@@ -260,9 +262,6 @@ def _regenerate_gp_predictions_figures(
 ) -> list[go.Figure]:
     """Regenerate GP prediction figures with current state and renames."""
     try:
-        import numpy as np
-        from plotly.subplots import make_subplots
-
         investigation_space = InvestigationSpace.from_json(
             Path(f"{LOCAL_TEMP_DIR}/{mlflow_run}/general/investigation_space.json")
         )
@@ -290,7 +289,10 @@ def _regenerate_gp_predictions_figures(
                     )
                     return []  # Return empty list if manufacturing data not found
             else:
-                pareto_csv = f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}/pareto_front_predictions.csv"
+                pareto_csv = (
+                    f"{LOCAL_TEMP_DIR}/{mlflow_run}/{iteration}"
+                    "/pareto_front_predictions.csv"
+                )
                 pareto_df = pd.read_csv(pareto_csv)
         except FileNotFoundError:
             pareto_df = pd.DataFrame()
@@ -317,7 +319,7 @@ def _regenerate_gp_predictions_figures(
         figures = []
         num_cols = len(var_pairs)
 
-        var_to_filter = {}
+        var_to_filter: dict[Any, Any] = {}
         if clicked_points is None:
             clicked_points = {}
         if pinned_points is None:
@@ -412,8 +414,8 @@ def _regenerate_gp_predictions_figures(
                         and var_x in experiments_df.columns
                         and var_y in experiments_df.columns
                     ):
-                        inside_bounds = []
-                        outside_bounds = []
+                        inside_bounds: list[Any] = []
+                        outside_bounds: list[Any] = []
 
                         # Classify experiments as inside or outside bounds
                         for idx in experiments_df.index:
@@ -521,7 +523,7 @@ def _regenerate_gp_predictions_figures(
                         col=col,
                         range=[y_min, y_max],
                     )
-                except Exception as e:
+                except Exception as e:  # pylint: disable=broad-exception-caught
                     print(f"Error processing pair {var_x} vs {var_y}: {e}")
                     continue
 
@@ -532,8 +534,8 @@ def _regenerate_gp_predictions_figures(
                     and var_y in pareto_df.columns
                 ):
                     # Classify pareto points as inside or outside bounds
-                    pareto_inside_bounds = []
-                    pareto_outside_bounds = []
+                    pareto_inside_bounds: list[Any] = []
+                    pareto_outside_bounds: list[Any] = []
 
                     for idx in pareto_df.index:
                         is_outside = False
@@ -756,7 +758,8 @@ def _regenerate_gp_predictions_figures(
                                         mode="lines",
                                         line=dict(color="red", width=2, dash="dash"),
                                         hovertemplate="<b>Confidence Box</b><br>"
-                                        f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
+                                        f"Confidence Level: "
+                                        f"{robustness_confidence_level}%<extra></extra>",
                                         name=f"Confidence Box ({robustness_confidence_level}%)",
                                         showlegend=True,
                                         fill="toself",
@@ -808,9 +811,15 @@ def _regenerate_gp_predictions_figures(
                                                     width=2,
                                                     dash="dash",
                                                 ),
-                                                hovertemplate="<b>Alternative Confidence Box</b><br>"
-                                                f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
-                                                name=f"Alternative Box ({robustness_confidence_level}%)",
+                                                hovertemplate=(
+                                                    "<b>Alternative Confidence Box</b><br>"
+                                                    "Confidence Level: "
+                                                    f"{robustness_confidence_level}%<extra></extra>"
+                                                ),
+                                                name=(
+                                                    f"Alternative Box "
+                                                    f"({robustness_confidence_level}%)"
+                                                ),
                                                 showlegend=True,
                                                 fill="toself",
                                                 fillcolor="rgba(0,255,0,0.05)",
@@ -862,7 +871,7 @@ def _regenerate_gp_predictions_figures(
             figures.append(fig)
 
         return figures
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error regenerating GP prediction figures: {e}")
         return []
 
@@ -890,7 +899,7 @@ def _export_investigation_space_csv(
 
         df = pd.DataFrame(rows)
         return df.to_csv(index=False)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error exporting investigation space: {e}")
         return None
 
@@ -912,13 +921,13 @@ def _export_optimization_problem_csv(
                 {
                     "objective_index": idx,
                     "variable_name": display_name,
-                    "direction": axis.direction,
+                    "direction": "minimize" if axis.minimize else "maximize",
                 }
             )
 
         df = pd.DataFrame(rows)
         return df.to_csv(index=False)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error exporting optimization problem: {e}")
         return None
 
@@ -948,7 +957,7 @@ def _export_measurements_csv(
                 df = df.rename(columns=rename_map)
 
             return df.to_csv(index=False)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error exporting measurements: {e}")
     return None
 
@@ -956,7 +965,6 @@ def _export_measurements_csv(
 def _export_pareto_front_csv(
     mlflow_run: str,
     iteration: str,
-    objective_renames: dict[str, str] | None = None,
     measurement_renames: dict[str, str] | None = None,
 ) -> str | None:
     """Export pareto front predictions as CSV string with renamed columns."""
@@ -975,7 +983,7 @@ def _export_pareto_front_csv(
                 df = df.rename(columns=rename_map)
 
             return df.to_csv(index=False)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error exporting pareto front: {e}")
     return None
 
@@ -1183,7 +1191,7 @@ def download_current_plots(
                         archive.writestr("measurements.csv", measurements_csv)
 
                     pareto_csv = _export_pareto_front_csv(
-                        mlflow_run, iteration, objective_renames, measurement_renames
+                        mlflow_run, iteration, measurement_renames
                     )
                     if pareto_csv:
                         archive.writestr("pareto_front.csv", pareto_csv)
@@ -1193,18 +1201,21 @@ def download_current_plots(
                 "PLOTS:\n"
                 "  - experiment-results-*.png: Experiment results scatter plots\n"
                 "  - investigation-space.png: Investigation space scatter plot\n"
-                "  - experiment-results-parcoords.png: Experiment results parallel coordinates plot\n"
+                "  - experiment-results-parcoords.png: Experiment results parallel coordinates "
+                "plot\n"
                 "  - gp-predictions-*.png: GP prediction contour plots\n"
                 "  - pareto-front.png: Pareto front scatter plots\n"
                 "  - pareto-front-parcoords.png: Pareto front parallel coordinates plot\n\n"
                 if not use_html_fallback
                 else (
-                    "This archive contains interactive HTML exports of the current dashboard plots.\n"
+                    "This archive contains interactive HTML exports of the current dashboard "
+                    "plots.\n"
                     "Open any .html file in your browser to view and interact with the plot.\n\n"
                     "PLOTS:\n"
                     "  - experiment-results-*.html: Experiment results scatter plots\n"
                     "  - investigation-space.html: Investigation space scatter plot\n"
-                    "  - experiment-results-parcoords.html: Experiment results parallel coordinates plot\n"
+                    "  - experiment-results-parcoords.html: Experiment results parallel "
+                    "coordinates plot\n"
                     "  - gp-predictions-*.html: GP prediction contour plots\n"
                     "  - pareto-front.html: Pareto front scatter plots\n"
                     "  - pareto-front-parcoords.html: Pareto front parallel coordinates plot\n\n"

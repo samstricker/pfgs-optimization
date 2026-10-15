@@ -7,7 +7,7 @@ import traceback
 from dash import Input, Output, State, ALL, callback_context
 import polars as pl
 
-from paretodo.data_models import OptimizationProblem, InvestigationSpace
+from paretodo.data_models import InvestigationSpace
 from paretodo.selection.selector import ParetoSelector
 
 from ..server import app
@@ -159,7 +159,8 @@ def automated_selection(
             if pareto_df.empty:
                 # Error: Manufacturing mode selected but data not available
                 print(
-                    "Error: Manufacturing data (manufacturing_front_predictions.csv) not found for automated selection"
+                    "Error: Manufacturing data (manufacturing_front_predictions.csv) not found "
+                    "for automated selection"
                 )
                 return {}
         else:

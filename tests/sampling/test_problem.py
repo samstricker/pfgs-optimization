@@ -19,7 +19,9 @@ from paretodo import (
 class SimpleProblem(BaseProblem):
     """Simple concrete implementation of BaseProblem for testing."""
 
-    def predict(self, x: NDArray[np.float64]) -> Tuple[Any, pl.DataFrame]:
+    def predict(
+        self, x: NDArray[np.float64], normalized: bool = True
+    ) -> Tuple[Any, pl.DataFrame]:
         """Simple mock prediction."""
         # x is normalized to [-1, 1], convert to real values
         predictions = x * 2  # Simple scaling
@@ -45,13 +47,11 @@ class SimpleProblem(BaseProblem):
 
         return objective_list
 
-    def _predict_for_pso(self, objective):
-        """Mock PSO prediction function."""
-
-        def objective_func(x):
-            return np.sum(x**2)
-
-        return objective_func
+    def prediction_to_robust_objective_values(
+        self, predictions, opt_axis: OptimizationAxis
+    ) -> NDArray[np.float64]:
+        """Mock robust objective values: first prediction column."""
+        return np.asarray(predictions).reshape(len(predictions), -1)[:, 0]
 
 
 class TestBaseProblem:

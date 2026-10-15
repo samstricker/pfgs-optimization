@@ -15,7 +15,6 @@ from ..data.dataset import Dataset
 set_logger()
 
 
-
 def df_to_dataset(df: pl.DataFrame, investigation_space: InvestigationSpace) -> Dataset:
     """Convert a Polars DataFrame to a Dataset object.
 
@@ -114,14 +113,14 @@ def discard_regions(
 
 
 def select_pareto_expert(
-        pareto_df: pl.DataFrame,
-        iteration: int,
-        discard_values: Dict[str, List[str]],
-        investigation_space: InvestigationSpace,
-        optimization_problem: OptimizationProblem,
-        n_samples: int,
-        simulator: Union[DigitalBioLabSimulator, HimmelblauButterotSimulator],
-        expert_type: str = "expert" # "expert" or "noob"
+    pareto_df: pl.DataFrame,
+    iteration: int,
+    discard_values: Dict[str, List[str]],
+    investigation_space: InvestigationSpace,
+    optimization_problem: OptimizationProblem,
+    n_samples: int,
+    simulator: Union[DigitalBioLabSimulator, HimmelblauButterotSimulator],
+    expert_type: str = "expert",  # "expert" or "noob"
 ) -> pl.DataFrame:
     # Selection of Recipes with the best true performance in the Pareto Front
     # Data Leakage is expected here, as the true performance is used to select the best recipes
@@ -148,7 +147,9 @@ def select_pareto_expert(
             else:
                 pareto_df = pareto_df.sort(f"true_{axis.var_name}", descending=True)
                 if expert_type == "noob":
-                    pareto_df = pareto_df.sort(f"true_{axis.var_name}", descending=False)
+                    pareto_df = pareto_df.sort(
+                        f"true_{axis.var_name}", descending=False
+                    )
             if n_samples > pareto_df.height:
                 raise ValueError(
                     f"Requested number of samples ({n_samples}) exceeds the number of available recipes in the Pareto front ({pareto_df.height})."
@@ -195,7 +196,7 @@ def select_pareto_exploit(
 ) -> pl.DataFrame:
     # Selection of the Highest Performing Recipe (Mean Value) from the Pareto Front
     # this will only work for the first objective optimization axis in the optimization problem
-    
+
     pareto_df = discard_regions(pareto_df, discard_values, iteration)
     for axis in optimization_problem.problem:
         name = "obj:"
@@ -214,4 +215,3 @@ def select_pareto_exploit(
                     f"Requested number of samples ({n_samples}) exceeds the number of available recipes in the Pareto front ({pareto_df.height})."
                 )
             return pareto_df.head(n_samples)
-

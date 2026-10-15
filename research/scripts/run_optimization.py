@@ -205,7 +205,9 @@ def main():
                     log.info("No more recipes to select. Ending optimization loop.")
                     break
             elif config["sampling_mode"] == "pareto_expert":
-                log.info("Selecting recipes from Pareto front using expert knowledge ...")
+                log.info(
+                    "Selecting recipes from Pareto front using expert knowledge ..."
+                )
                 selected_recipes = select_pareto_expert(
                     pareto_df=pareto_df,
                     iteration=iteration,
@@ -235,7 +237,9 @@ def main():
                     log.info("No more recipes to select. Ending optimization loop.")
                     break
             elif config["sampling_mode"] == "pareto_explore":
-                log.info("Selecting recipes from Pareto front using explore knowledge ...")
+                log.info(
+                    "Selecting recipes from Pareto front using explore knowledge ..."
+                )
                 selected_recipes = select_pareto_explore(
                     pareto_df=pareto_df,
                     iteration=iteration,
@@ -247,7 +251,9 @@ def main():
                     log.info("No more recipes to select. Ending optimization loop.")
                     break
             elif config["sampling_mode"] == "pareto_exploit":
-                log.info("Selecting recipes from Pareto front using exploit knowledge ...")
+                log.info(
+                    "Selecting recipes from Pareto front using exploit knowledge ..."
+                )
                 selected_recipes = select_pareto_exploit(
                     pareto_df=pareto_df,
                     iteration=iteration,

@@ -27,7 +27,9 @@ class DigitalBioLabSimulator:
         self.config = config
         self.mlflow_logger = mlflow_logger
 
-    def run_simulation(self, recipes: Dataset, iteration: Optional[int] = None) -> Dataset:
+    def run_simulation(
+        self, recipes: Dataset, iteration: Optional[int] = None
+    ) -> Dataset:
         if recipes.dataset_type != "recipes":
             raise ValueError("Input dataset must be of type 'recipes'.")
         recipes.denormalize()

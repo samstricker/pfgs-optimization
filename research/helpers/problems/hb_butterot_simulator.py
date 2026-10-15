@@ -10,7 +10,9 @@ from helpers.data.dataset import Dataset
 
 class HimmelblauButterotSimulator:
 
-    def run_simulation(self, recipes: Dataset, iteration: Optional[int] = None) -> Dataset:
+    def run_simulation(
+        self, recipes: Dataset, iteration: Optional[int] = None
+    ) -> Dataset:
         """Run the simulation for the given recipes dataset.
 
         Parameters

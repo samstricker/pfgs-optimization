@@ -400,7 +400,7 @@ class Dataset:
         if not self.y_labels:
             raise ValueError("experiment_dataset.y_labels is empty.")
         experiment_df = self.to_dataframe()
-        
+
         for axis in optimization_problem.problem:
             if axis.optimization_type == "constraint":
                 if axis.lower_bound is not None:
@@ -410,7 +410,7 @@ class Dataset:
                 if axis.upper_bound is not None:
                     experiment_df = experiment_df.filter(
                         pl.col(axis.var_name) <= axis.upper_bound
-                    )  
+                    )
         result_dict = {}
         for objective in optimization_problem.problem:
             if objective.optimization_type == "objective":

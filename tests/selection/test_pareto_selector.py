@@ -1,6 +1,8 @@
 """Tests for ParetoSelector algorithm."""
 
-import numpy as np
+# Pytest fixtures are injected by parameter name, and tests exercise private helpers.
+# pylint: disable=redefined-outer-name,protected-access
+
 import polars as pl
 import pytest
 
@@ -167,7 +169,8 @@ def test_spread_selection_with_experiments(
     )
 
     # Without experiments: should select D (farthest from A)
-    # With experiments at D: should select something else (B or C, both at distance 10 from A and far from D)
+    # With experiments at D: should select something else
+    # (B or C, both at distance 10 from A and far from D)
 
     # The second selected point should NOT be D (because experiment is at D)
     recipe_ids = selected_with_exp["RecipeID"].to_list()

@@ -8,6 +8,7 @@ __all__ = [
 ]
 
 from typing import Any
+import re
 import traceback
 
 import numpy as np
@@ -41,8 +42,6 @@ def _extract_name_from_pattern(display_name: str) -> tuple[str | None, str | Non
         Tuple of (prefix, inner_name) or (None, None) if pattern doesn't match
     """
     # Match patterns like μ(name), R(name), etc. anywhere in the string
-    import re
-
     match = re.search(r"([μR])\(([^)]+)\)", display_name)
     if match:
         return match.group(1), match.group(2)
@@ -125,7 +124,10 @@ def update_pareto_front_plots(
                 fig = go.Figure()
                 fig.update_layout(template=get_theme())
                 fig.add_annotation(
-                    text="Error: Manufacturing data (manufacturing_front_predictions.csv) not found for this iteration. Please check the MLflow artifacts.",
+                    text=(
+                        "Error: Manufacturing data (manufacturing_front_predictions.csv) not "
+                        "found for this iteration. Please check the MLflow artifacts."
+                    ),
                     showarrow=False,
                     font=dict(size=14, color="red"),
                 )
@@ -271,7 +273,9 @@ def update_pareto_front_plots(
                 inside_pareto_df = pareto_df.loc[pareto_inside_bounds]
                 inside_customdata = []
                 for idx, row_data in inside_pareto_df.iterrows():  # type: ignore[assignment]
-                    inside_customdata.append([int(idx)] + row_data.tolist())  # type: ignore[arg-type]
+                    inside_customdata.append(
+                        [int(idx)] + row_data.tolist()  # type: ignore[arg-type]
+                    )
 
                 fig.add_trace(
                     go.Scatter(
@@ -297,7 +301,9 @@ def update_pareto_front_plots(
                 outside_pareto_df = pareto_df.loc[pareto_outside_bounds]
                 outside_customdata = []
                 for idx, row_data in outside_pareto_df.iterrows():  # type: ignore[assignment]
-                    outside_customdata.append([int(idx)] + row_data.tolist())  # type: ignore[arg-type]
+                    outside_customdata.append(
+                        [int(idx)] + row_data.tolist()  # type: ignore[arg-type]
+                    )
 
                 fig.add_trace(
                     go.Scatter(
@@ -526,7 +532,8 @@ def update_pareto_details_table(
                 # Error: Manufacturing mode selected but data not available
                 return (
                     html.Div(
-                        "Error: Manufacturing data (manufacturing_front_predictions.csv) not found for this iteration.",
+                        "Error: Manufacturing data (manufacturing_front_predictions.csv) not "
+                        "found for this iteration.",
                         style={"color": "red", "fontWeight": "bold", "padding": "10px"},
                     ),
                     pinned_data,
@@ -687,7 +694,10 @@ def update_pareto_front_parcoords(
                 fig = go.Figure()
                 fig.update_layout(template=get_theme())
                 fig.add_annotation(
-                    text="Error: Manufacturing data (manufacturing_front_predictions.csv) not found for this iteration.",
+                    text=(
+                        "Error: Manufacturing data (manufacturing_front_predictions.csv) not "
+                        "found for this iteration."
+                    ),
                     showarrow=False,
                     font=dict(size=14, color="red"),
                 )
@@ -855,7 +865,8 @@ def update_pareto_front_parcoords(
             return fig
 
         # Create parallel coordinates plot with custom discrete colorscale
-        # Always use cmin=0, cmax=2 to keep color mapping consistent regardless of visibility toggles
+        # Always use cmin=0, cmax=2 to keep color mapping consistent
+        # regardless of visibility toggles
         fig = go.Figure(
             data=go.Parcoords(
                 dimensions=dimensions,

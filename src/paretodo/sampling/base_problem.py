@@ -1,14 +1,13 @@
 """Basic optimization problem."""
 
 from abc import abstractmethod
-from typing import Callable, Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import norm
 import polars as pl
 from pymoo.core.problem import Problem
-import pyswarms as ps
 
 
 from paretodo.data_models import (

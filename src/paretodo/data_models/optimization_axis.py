@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 
-@dataclass
+@dataclass(frozen=True)
 class OptimizationAxis:
     """Representation of an optimization axis. One of objective to optimize."""
 
@@ -53,4 +53,4 @@ class OptimizationAxis:
         minimize : bool
             Whether to minimize (True) or maximize (False) this optimization axis.
         """
-        self.minimize = minimize
+        object.__setattr__(self, "minimize", minimize)

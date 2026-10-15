@@ -44,7 +44,7 @@ class ConvergenceCallback(TqdmCallback):
         Maximum number of generations (for the progress bar).
     ref_point : Optional[np.ndarray], optional
         Reference point for the hypervolume (minimization space). If None, it is
-        set once from the first generation as max(F) + 10% of its range.
+        set once from the first generation as max(f_pop) + 10% of its range.
     """
 
     def __init__(self, n_max_gen: int, ref_point: Optional[np.ndarray] = None):
@@ -53,24 +53,24 @@ class ConvergenceCallback(TqdmCallback):
             None if ref_point is None else np.asarray(ref_point, dtype=float)
         )
         self._hv = None if self.ref_point is None else HV(ref_point=self.ref_point)
-        self.n_gen = []
-        self.n_evals = []
-        self.hypervolume = []
-        self.best_f = []
+        self.n_gen: list[int] = []
+        self.n_evals: list[int] = []
+        self.hypervolume: list[float] = []
+        self.best_f: list[np.ndarray] = []
 
     def notify(self, algorithm):
         super().notify(algorithm)
-        F = algorithm.pop.get("F")
+        f_pop = algorithm.pop.get("F")
         if self._hv is None:
-            f_min, f_max = F.min(axis=0), F.max(axis=0)
+            f_min, f_max = f_pop.min(axis=0), f_pop.max(axis=0)
             self.ref_point = f_max + 0.1 * np.maximum(f_max - f_min, 1e-12)
             self._hv = HV(ref_point=self.ref_point)
 
         self.n_gen.append(algorithm.n_gen)
         self.n_evals.append(algorithm.evaluator.n_eval)
-        hv = self._hv(F)
+        hv = self._hv(f_pop)
         self.hypervolume.append(float(hv) if hv is not None else np.nan)
-        self.best_f.append(F.min(axis=0))
+        self.best_f.append(f_pop.min(axis=0))
 
     def to_dataframe(self) -> pl.DataFrame:
         """Return the convergence history as a DataFrame (one row per generation)."""

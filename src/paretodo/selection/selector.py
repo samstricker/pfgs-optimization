@@ -109,7 +109,7 @@ class ParetoSelector:
         max_bounds = pareto_space_original.max().to_numpy().flatten()
         space_bounds = np.array([min_bounds, max_bounds])
 
-        for iteration in range(n_additional):
+        for _ in range(n_additional):
             # Use only available columns that exist in remaining pareto front
             available_cols_current = [
                 col for col in available_cols if col in pareto_front.columns

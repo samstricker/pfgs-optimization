@@ -80,7 +80,10 @@ def update_investigation_space_plots(
                 fig = go.Figure()
                 fig.update_layout(template=get_theme())
                 fig.add_annotation(
-                    text="Error: Manufacturing data (manufacturing_front_predictions.csv) not found for this iteration.",
+                    text=(
+                        "Error: Manufacturing data (manufacturing_front_predictions.csv) not "
+                        "found for this iteration."
+                    ),
                     showarrow=False,
                     font=dict(size=14, color="red"),
                 )
@@ -91,7 +94,9 @@ def update_investigation_space_plots(
             )
 
         # Load OptimizationProblem to get objective names map
-        optimization_problem_data = load_optimization_problem(mlflow_run, pareto_mode)
+        optimization_problem_data = load_optimization_problem(
+            mlflow_run, pareto_mode or "Optimization"
+        )
         objective_names_map = {}
         for idx, axis in enumerate(optimization_problem_data.problem):
             objective_names_map[idx] = axis.var_name

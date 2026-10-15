@@ -1,5 +1,7 @@
 """Callbacks for GP predictions visualization."""
 
+# pylint: disable=too-many-lines
+
 __all__ = [
     "populate_gp_filters",
     "populate_robustness_pareto_points",
@@ -271,7 +273,8 @@ def update_gp_predictions(
                 # Error: Manufacturing mode selected but data not available
                 return [
                     html.Div(
-                        "Error: Manufacturing data (manufacturing_front_predictions.csv) not found for this iteration.",
+                        "Error: Manufacturing data (manufacturing_front_predictions.csv) not "
+                        "found for this iteration.",
                         style={"color": "red", "fontWeight": "bold", "padding": "10px"},
                     )
                 ]
@@ -882,7 +885,8 @@ def update_gp_predictions(
                                             dash="dash",
                                         ),
                                         hovertemplate="<b>Confidence Box</b><br>"
-                                        f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
+                                        f"Confidence Level: "
+                                        f"{robustness_confidence_level}%<extra></extra>",
                                         name=f"Confidence Box ({robustness_confidence_level}%)",
                                         showlegend=True,
                                         fill="toself",
@@ -939,9 +943,15 @@ def update_gp_predictions(
                                                     width=2,
                                                     dash="dash",
                                                 ),
-                                                hovertemplate="<b>Alternative Confidence Box</b><br>"
-                                                f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
-                                                name=f"Alternative Box ({robustness_confidence_level}%)",
+                                                hovertemplate=(
+                                                    "<b>Alternative Confidence Box</b><br>"
+                                                    "Confidence Level: "
+                                                    f"{robustness_confidence_level}%<extra></extra>"
+                                                ),
+                                                name=(
+                                                    f"Alternative Box "
+                                                    f"({robustness_confidence_level}%)"
+                                                ),
                                                 showlegend=True,
                                                 fill="toself",
                                                 fillcolor="rgba(0,255,0,0.05)",
@@ -1492,7 +1502,8 @@ def store_gp_predictions_figures(
                                         mode="lines",
                                         line=dict(color="red", width=2, dash="dash"),
                                         hovertemplate="<b>Confidence Box</b><br>"
-                                        f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
+                                        f"Confidence Level: "
+                                        f"{robustness_confidence_level}%<extra></extra>",
                                         name=f"Confidence Box ({robustness_confidence_level}%)",
                                         showlegend=True,
                                         fill="toself",
@@ -1544,9 +1555,15 @@ def store_gp_predictions_figures(
                                                     width=2,
                                                     dash="dash",
                                                 ),
-                                                hovertemplate="<b>Alternative Confidence Box</b><br>"
-                                                f"Confidence Level: {robustness_confidence_level}%<extra></extra>",
-                                                name=f"Alternative Box ({robustness_confidence_level}%)",
+                                                hovertemplate=(
+                                                    "<b>Alternative Confidence Box</b><br>"
+                                                    "Confidence Level: "
+                                                    f"{robustness_confidence_level}%<extra></extra>"
+                                                ),
+                                                name=(
+                                                    f"Alternative Box "
+                                                    f"({robustness_confidence_level}%)"
+                                                ),
                                                 showlegend=True,
                                                 fill="toself",
                                                 fillcolor="rgba(0,255,0,0.05)",
@@ -1576,7 +1593,7 @@ def store_gp_predictions_figures(
                         col=col,
                         range=[y_min, y_max],
                     )
-                except Exception as e:
+                except Exception as e:  # pylint: disable=broad-exception-caught
                     print(f"Error processing pair {var_x} vs {var_y}: {e}")
                     continue
 
@@ -1601,6 +1618,6 @@ def store_gp_predictions_figures(
             figures.append(fig.to_dict())
 
         return figures
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error storing GP prediction figures: {e}")
         return []

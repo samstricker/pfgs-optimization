@@ -7,7 +7,7 @@ from dash import Input, Output, html
 import mlflow
 import pandas as pd
 
-from paretodo.data_models import InvestigationSpace, OptimizationProblem
+from paretodo.data_models import InvestigationSpace
 
 from ..server import app
 
