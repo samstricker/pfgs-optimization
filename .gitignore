@@ -7,4 +7,6 @@ build/*
 .temp/*
 mlruns/*
 mlflow.db
-report.log
+*report.log
+*.temp
+*.DS_Store

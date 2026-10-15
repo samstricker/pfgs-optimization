@@ -17,6 +17,9 @@ from helpers.sampling.sampling_lhs import lhs_sampling
 from helpers.sampling.selection_pfgs import (
     select_automatic_recipes,
     select_hitl_recipes,
+    select_pareto_exploit,
+    select_pareto_explore,
+    select_pareto_expert,
 )
 from helpers.sampling.sampling_pfgs import sample_pfgs
 from helpers.sampling.sampling_bo import sample_bo
@@ -29,6 +32,7 @@ from paretodo import (
     InvestigationSpace,
     OptimizationProblem,
 )
+
 
 def main():
     """Main function to run the Himmelblau optimization."""
@@ -69,12 +73,35 @@ def main():
     )
 
     for iteration in range(1, config["n_iterations"] + 1):
+        optimization_problem = OptimizationProblem.from_json(
+            Path(files["optimization_problem"])
+        )
+        manufacturing_problem = OptimizationProblem.from_json(
+            Path(files["optimization_problem"])
+        )
         log.info("Starting iteration %d", iteration)
         ml_logger.log_dataframe(
             experiment_dataset.to_dataframe(),
             datatype="experiments",
             iteration=iteration,
         )
+
+        best_objectives = experiment_dataset.get_best_objective_values(
+            optimization_problem
+        )
+        for obj_name, obj_value in best_objectives.items():
+            ml_logger.log_metric(f"best_{obj_name}", obj_value, step=iteration)
+
+        constraint_violations = experiment_dataset.get_constraint_violations(
+            optimization_problem
+        )
+        for con_name, con_value in constraint_violations.items():
+            ml_logger.log_metric(
+                f"constraint_violations_{con_name}", con_value, step=iteration
+            )
+
+        # TODO: Maybe something for robustness
+
         model_dataset = experiment_dataset.copy()
 
         log.info("Training surrogate model ...")
@@ -113,12 +140,6 @@ def main():
             )
             ml_logger.log_metric(f"rrmse_{testset_name}", rrmse, step=n_experiments)
 
-        optimization_problem = OptimizationProblem.from_json(
-            Path(files["optimization_problem"])
-        )
-        manufacturing_problem = OptimizationProblem.from_json(
-            Path(files["optimization_problem"])
-        )
         for obj in manufacturing_problem.problem:
             if obj.optimization_type == "standard_deviation":
                 obj.set_minimize(True)
@@ -131,7 +152,7 @@ def main():
         )
         if config["algorithm"] == "pfgs":
             log.info("Running PFGS optimization ...")
-            manufacturing_df = sample_pfgs(
+            manufacturing_df, manufacturing_convergence_df = sample_pfgs(
                 nsga2_config=config["nsga2_config"],
                 investigation_space=investigation_space,
                 model_dataset=model_dataset,
@@ -144,7 +165,12 @@ def main():
                 datatype="manufacturing_front",
                 iteration=iteration,
             )
-            pareto_df = sample_pfgs(
+            ml_logger.log_dataframe(
+                manufacturing_convergence_df,
+                datatype="manufacturing_convergence",
+                iteration=iteration,
+            )
+            pareto_df, pareto_convergence_df = sample_pfgs(
                 nsga2_config=config["nsga2_config"],
                 investigation_space=investigation_space,
                 model_dataset=model_dataset,
@@ -157,6 +183,11 @@ def main():
                 datatype="pareto_front",
                 iteration=iteration,
             )
+            ml_logger.log_dataframe(
+                pareto_convergence_df,
+                datatype="pareto_convergence",
+                iteration=iteration,
+            )
             if config["sampling_mode"] == "hitl":
                 selected_recipes = select_hitl_recipes(pareto_df, iteration)
                 if selected_recipes.is_empty():
@@ -167,6 +198,60 @@ def main():
                     iteration=iteration,
                     discard_values=config["discard_values"],
                     investigation_space=investigation_space,
+                    optimization_problem=optimization_problem,
+                    n_samples=config["batch_size"],
+                )
+                if selected_recipes.is_empty():
+                    log.info("No more recipes to select. Ending optimization loop.")
+                    break
+            elif config["sampling_mode"] == "pareto_expert":
+                log.info("Selecting recipes from Pareto front using expert knowledge ...")
+                selected_recipes = select_pareto_expert(
+                    pareto_df=pareto_df,
+                    iteration=iteration,
+                    discard_values=config["discard_values"],
+                    investigation_space=investigation_space,
+                    optimization_problem=optimization_problem,
+                    n_samples=config["batch_size"],
+                    simulator=simulator,
+                    expert_type="expert",
+                )
+                if selected_recipes.is_empty():
+                    log.info("No more recipes to select. Ending optimization loop.")
+                    break
+            elif config["sampling_mode"] == "pareto_noob":
+                log.info("Selecting recipes from Pareto front using noob knowledge ...")
+                selected_recipes = select_pareto_expert(
+                    pareto_df=pareto_df,
+                    iteration=iteration,
+                    discard_values=config["discard_values"],
+                    investigation_space=investigation_space,
+                    optimization_problem=optimization_problem,
+                    n_samples=config["batch_size"],
+                    simulator=simulator,
+                    expert_type="noob",
+                )
+                if selected_recipes.is_empty():
+                    log.info("No more recipes to select. Ending optimization loop.")
+                    break
+            elif config["sampling_mode"] == "pareto_explore":
+                log.info("Selecting recipes from Pareto front using explore knowledge ...")
+                selected_recipes = select_pareto_explore(
+                    pareto_df=pareto_df,
+                    iteration=iteration,
+                    discard_values=config["discard_values"],
+                    optimization_problem=optimization_problem,
+                    n_samples=config["batch_size"],
+                )
+                if selected_recipes.is_empty():
+                    log.info("No more recipes to select. Ending optimization loop.")
+                    break
+            elif config["sampling_mode"] == "pareto_exploit":
+                log.info("Selecting recipes from Pareto front using exploit knowledge ...")
+                selected_recipes = select_pareto_exploit(
+                    pareto_df=pareto_df,
+                    iteration=iteration,
+                    discard_values=config["discard_values"],
                     optimization_problem=optimization_problem,
                     n_samples=config["batch_size"],
                 )

@@ -1067,7 +1067,8 @@ def download_current_plots(
         # Fall back to stored serialized figures only if regeneration produced no figures
         if (not gp_figures or len(gp_figures) == 0) and gp_prediction_figures_store:
             gp_figures = [
-                _figure_from_store(figure_data) for figure_data in gp_prediction_figures_store
+                _figure_from_store(figure_data)
+                for figure_data in gp_prediction_figures_store
             ]
         for index, fig in enumerate(gp_figures, start=1):
             figures.append((f"gp-predictions-{index:02d}", fig))

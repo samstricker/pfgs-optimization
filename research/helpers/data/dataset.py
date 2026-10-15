@@ -9,6 +9,8 @@ import numpy as np
 from numpy.typing import NDArray
 import polars as pl
 
+from paretodo.data_models.optimization_problem import OptimizationProblem
+
 
 @dataclass
 class Dataset:
@@ -353,19 +355,105 @@ class Dataset:
         return cls(
             dataset_type=data_dict["dataset_type"],
             x_labels=data_dict["x_labels"],
-            x_data=np.array(data_dict["x_data"], dtype=np.float64)
-            if data_dict["x_data"] is not None
-            else None,
+            x_data=(
+                np.array(data_dict["x_data"], dtype=np.float64)
+                if data_dict["x_data"] is not None
+                else None
+            ),
             y_labels=data_dict.get("y_labels"),
-            y_data=np.array(data_dict["y_data"], dtype=np.float64)
-            if data_dict.get("y_data") is not None
-            else None,
-            y_errors=np.array(data_dict["y_errors"], dtype=np.float64)
-            if data_dict.get("y_errors") is not None
-            else None,
+            y_data=(
+                np.array(data_dict["y_data"], dtype=np.float64)
+                if data_dict.get("y_data") is not None
+                else None
+            ),
+            y_errors=(
+                np.array(data_dict["y_errors"], dtype=np.float64)
+                if data_dict.get("y_errors") is not None
+                else None
+            ),
             normalized=data_dict.get("normalized", False),
             normalizer_mean=data_dict.get("normalizer_mean", {}),
             normalizer_std=data_dict.get("normalizer_std", {}),
             normalizer_min=data_dict.get("normalizer_min", {}),
             normalizer_max=data_dict.get("normalizer_max", {}),
         )
+
+    def get_best_objective_values(self, optimization_problem: OptimizationProblem):
+        """Calculate the current best objective values from the experiment dataset.
+
+        Parameters
+        ----------
+        optimization_problem : OptimizationProblem
+            The optimization problem definition containing the objectives.
+
+        Returns
+        -------
+        dict
+            A dictionary with the current best objective values for each objective in the optimization problem.
+        """
+        if not isinstance(optimization_problem, OptimizationProblem):
+            raise TypeError(
+                f"optimization_problem must be an instance of OptimizationProblem, got {type(optimization_problem)}."
+            )
+        if self.y_data is None or len(self.y_data) == 0:
+            raise ValueError("experiment_dataset.y_data is empty.")
+        if not self.y_labels:
+            raise ValueError("experiment_dataset.y_labels is empty.")
+        experiment_df = self.to_dataframe()
+        
+        for axis in optimization_problem.problem:
+            if axis.optimization_type == "constraint":
+                if axis.lower_bound is not None:
+                    experiment_df = experiment_df.filter(
+                        pl.col(axis.var_name) >= axis.lower_bound
+                    )
+                if axis.upper_bound is not None:
+                    experiment_df = experiment_df.filter(
+                        pl.col(axis.var_name) <= axis.upper_bound
+                    )  
+        result_dict = {}
+        for objective in optimization_problem.problem:
+            if objective.optimization_type == "objective":
+                if objective.minimize:
+                    best_value = min(experiment_df[objective.var_name])
+                else:
+                    best_value = max(experiment_df[objective.var_name])
+                result_dict[objective.var_name] = best_value
+        return result_dict
+
+    def get_constraint_violations(self, optimization_problem: OptimizationProblem):
+        """Calculate the number of constraint violations in the experiment dataset.
+
+        Parameters
+        ----------
+        optimization_problem : OptimizationProblem
+            The optimization problem definition containing the constraints.
+
+        Returns
+        -------
+        dict
+            A dictionary with the number of violations for each constraint in the optimization problem.
+        """
+        if not isinstance(optimization_problem, OptimizationProblem):
+            raise TypeError(
+                f"optimization_problem must be an instance of OptimizationProblem, got {type(optimization_problem)}."
+            )
+        if self.y_data is None or len(self.y_data) == 0:
+            raise ValueError("experiment_dataset.y_data is empty.")
+        if not self.y_labels:
+            raise ValueError("experiment_dataset.y_labels is empty.")
+        result_dict = {}
+        for constraint in optimization_problem.problem:
+            if constraint.optimization_type == "constraint":
+                violation_count = 0
+                pos_idx = self.y_labels.index(constraint.var_name)
+                if constraint.lower_bound is not None:
+                    violation_count += (
+                        self.y_data[:, pos_idx] < constraint.lower_bound
+                    ).sum()
+                if constraint.upper_bound is not None:
+                    violation_count += (
+                        self.y_data[:, pos_idx] > constraint.upper_bound
+                    ).sum()
+                result_dict[constraint.var_name] = violation_count
+        return result_dict

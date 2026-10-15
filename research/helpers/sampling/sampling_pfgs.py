@@ -21,7 +21,8 @@ def sample_pfgs(
     model: BoTorchGP,
     optimization_problem,
     problem_type: str,
-) -> pl.DataFrame:
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Run the PFGS and return the Pareto front and its NSGA2 convergence history."""
 
     if problem_type in ["himmelblau", "hb_butterot", "bio", "dataset"]:
         problem = GenericProblem(
@@ -42,4 +43,5 @@ def sample_pfgs(
         n_max_gen=nsga2_config["n_max_gen"],
     )
     _, pareto_df = pareto_generator.generate_pareto_front()
-    return pareto_df
+    convergence_df = pareto_generator.convergence.to_dataframe()
+    return pareto_df, convergence_df

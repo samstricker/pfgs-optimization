@@ -27,14 +27,14 @@ class DigitalBioLabSimulator:
         self.config = config
         self.mlflow_logger = mlflow_logger
 
-    def run_simulation(self, recipes: Dataset, iteration: int) -> Dataset:
+    def run_simulation(self, recipes: Dataset, iteration: Optional[int] = None) -> Dataset:
         if recipes.dataset_type != "recipes":
             raise ValueError("Input dataset must be of type 'recipes'.")
         recipes.denormalize()
         experiment_dataset = recipes.copy()
         simulator, mammalian_dataset = self._dataset_to_mamallian_inputs(recipes)
         exp_data = simulator.run_dataset(mammalian_dataset, seed=self.config["seed"])
-        if self.config["visualize"].lower() == "true":
+        if self.config["visualize"].lower() == "true" and iteration is not None:
             self._plot_and_log_time_series(exp_data, iteration)
         experiment_dataset = self._mammalian_dataset_to_experiment_dataset(
             exp_data, experiment_dataset

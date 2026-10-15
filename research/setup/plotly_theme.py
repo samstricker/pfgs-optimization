@@ -68,6 +68,30 @@ plotly_theme = go.layout.Template(
 )
 
 
+_original_write_image = go.Figure.write_image
+
+
+def _write_image_with_utf8_svg(self, file, *args, **kwargs):
+    """Wrap Figure.write_image so exported .svg files declare UTF-8.
+
+    Kaleido writes SVGs without an XML encoding declaration. Some viewers and
+    converters then guess Windows-1252 instead of UTF-8, turning characters
+    like μ/σ into mojibake (e.g. "σ" becomes "Ïƒ"). Prepending an explicit
+    <?xml ... encoding="UTF-8"?> prolog removes that ambiguity.
+    """
+    result = _original_write_image(self, file, *args, **kwargs)
+    if isinstance(file, str) and file.lower().endswith(".svg"):
+        with open(file, "r", encoding="utf-8") as f:
+            content = f.read()
+        if not content.startswith("<?xml"):
+            with open(file, "w", encoding="utf-8") as f:
+                f.write('<?xml version="1.0" encoding="UTF-8"?>\n' + content)
+    return result
+
+
+go.Figure.write_image = _write_image_with_utf8_svg
+
+
 def register_theme():
     """Register the custom Plotly theme globally."""
     pio.templates["pareto_theme"] = plotly_theme

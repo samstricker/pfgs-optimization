@@ -1,10 +1,10 @@
 [parameters]
-name = "Test_NewRepo_Bio-11-08-2026"
+name = "Rev-Benchmark_convergence_Opt-15-09-2026"
 problem = "bio"
 algorithm = "pfgs"
 initial_samples = 10
-sampling_mode = "automatic"
-n_iterations = 10
+sampling_mode = "pareto_expert"
+n_iterations = 30
 batch_size = 1
 seed = 11
 meshgrid_points_per_dim = 3
@@ -17,12 +17,13 @@ reactor = "research/.local/dbiolab_defaults/MTP_1.json"
 mammalian_recipe = "research/.local/dbiolab_defaults/recipe.json"
 
 [parameters.nsga2_config]
-robustness_confidence = 0.95
-pop_size_per_dim = 50
-n_max_gen = 1000
+robustness_confidence = 0.0
+pop_size_per_dim = 30
+n_max_gen = 300
 seed = 11
 
 [parameters.discard_values]
+# "obj:max(P(purity))" = ["(0.8, null)"]
 
 [files]
 investigation_space = "research/.local/bio_is/is_6d.json"

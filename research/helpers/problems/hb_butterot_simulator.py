@@ -1,5 +1,7 @@
 """This module contains the simulation function for the Himmelblau problem."""
 
+from typing import Optional
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -8,7 +10,7 @@ from helpers.data.dataset import Dataset
 
 class HimmelblauButterotSimulator:
 
-    def run_simulation(self, recipes: Dataset, iteration: int) -> Dataset:
+    def run_simulation(self, recipes: Dataset, iteration: Optional[int] = None) -> Dataset:
         """Run the simulation for the given recipes dataset.
 
         Parameters

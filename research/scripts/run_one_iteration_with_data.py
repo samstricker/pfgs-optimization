@@ -1,4 +1,4 @@
-""" This file runs one iteration of the optimization process using Provided Data. """
+"""This file runs one iteration of the optimization process using Provided Data."""
 
 import logging as log
 from pathlib import Path
@@ -16,7 +16,6 @@ from helpers.botorch_gp import BoTorchGP
 from helpers.sampling.sampling_pfgs import sample_pfgs
 
 from helpers.data.dataset import Dataset
-
 
 
 def main():
@@ -55,7 +54,7 @@ def main():
     )
 
     model_dataset = experiment_dataset.copy()
-    
+
     log.info("Training surrogate model ...")
     model = BoTorchGP()
     model.train(
@@ -74,7 +73,7 @@ def main():
     )
 
     log.info("Running PFGS optimization ...")
-    pareto_df = sample_pfgs(
+    pareto_df, pareto_convergence_df = sample_pfgs(
         nsga2_config=config["nsga2_config"],
         investigation_space=investigation_space,
         model_dataset=model_dataset,
@@ -87,7 +86,13 @@ def main():
         datatype="pareto_front",
         iteration=iteration,
     )
-    
+    ml_logger.log_dataframe(
+        pareto_convergence_df,
+        datatype="pareto_convergence",
+        iteration=iteration,
+    )
+
+
 if __name__ == "__main__":
     set_logger()
     main()

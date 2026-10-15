@@ -57,7 +57,7 @@ def concatenate_datasets(dataset1: Dataset, dataset2: Dataset) -> Dataset:
     if dataset1.y_labels != dataset2.y_labels:
         raise ValueError("y_labels of both datasets must be the same")
     if dataset1.x_data is None:
-        return dataset2 
+        return dataset2
     if dataset2.x_data is None:
         return dataset1
     x_data = np.vstack([dataset1.x_data, dataset2.x_data])

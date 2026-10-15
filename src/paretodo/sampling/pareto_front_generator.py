@@ -11,6 +11,7 @@ from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 from pymoo.termination.default import DefaultMultiObjectiveTermination
 from pymoo.core.callback import Callback
+from pymoo.indicators.hv import HV
 from tqdm import tqdm
 
 from paretodo.sampling import BaseProblem
@@ -34,6 +35,56 @@ class TqdmCallback(Callback):
             pass
 
 
+class ConvergenceCallback(TqdmCallback):
+    """Progress callback that also records convergence metrics per generation.
+
+    Parameters
+    ----------
+    n_max_gen : int
+        Maximum number of generations (for the progress bar).
+    ref_point : Optional[np.ndarray], optional
+        Reference point for the hypervolume (minimization space). If None, it is
+        set once from the first generation as max(F) + 10% of its range.
+    """
+
+    def __init__(self, n_max_gen: int, ref_point: Optional[np.ndarray] = None):
+        super().__init__(n_max_gen)
+        self.ref_point = (
+            None if ref_point is None else np.asarray(ref_point, dtype=float)
+        )
+        self._hv = None if self.ref_point is None else HV(ref_point=self.ref_point)
+        self.n_gen = []
+        self.n_evals = []
+        self.hypervolume = []
+        self.best_f = []
+
+    def notify(self, algorithm):
+        super().notify(algorithm)
+        F = algorithm.pop.get("F")
+        if self._hv is None:
+            f_min, f_max = F.min(axis=0), F.max(axis=0)
+            self.ref_point = f_max + 0.1 * np.maximum(f_max - f_min, 1e-12)
+            self._hv = HV(ref_point=self.ref_point)
+
+        self.n_gen.append(algorithm.n_gen)
+        self.n_evals.append(algorithm.evaluator.n_eval)
+        hv = self._hv(F)
+        self.hypervolume.append(float(hv) if hv is not None else np.nan)
+        self.best_f.append(F.min(axis=0))
+
+    def to_dataframe(self) -> pl.DataFrame:
+        """Return the convergence history as a DataFrame (one row per generation)."""
+        best_f = np.vstack(self.best_f) if self.best_f else np.empty((0, 0))
+        return pl.DataFrame(
+            {
+                "n_gen": self.n_gen,
+                "n_evals": self.n_evals,
+                "hypervolume": self.hypervolume,
+                **{f"best_f{i + 1}": best_f[:, i] for i in range(best_f.shape[1])},
+            }
+        )
+
+
 class ParetoFrontGenerator:
     """Class to generate Pareto front using multi-objective optimization.
 
@@ -51,6 +102,7 @@ class ParetoFrontGenerator:
         seed: Optional[int] = 11,
         pop_size_per_dim: int = 10,
         n_max_gen: int = 50,
+        ref_point: Optional[np.ndarray] = None,
     ):
         self.seed = seed
         random.seed(self.seed)
@@ -59,6 +111,8 @@ class ParetoFrontGenerator:
         self.problem = problem
         self.pop_size_per_dim = pop_size_per_dim
         self.n_max_gen = n_max_gen
+        self.ref_point = ref_point
+        self.convergence: Optional[ConvergenceCallback] = None
         self._log_problem()
 
     def generate_pareto_front(self) -> Tuple[Any, pl.DataFrame]:
@@ -71,13 +125,14 @@ class ParetoFrontGenerator:
 
         """
         algorithm, termination = self._get_algorithm_inputs()
+        self.convergence = ConvergenceCallback(self.n_max_gen, self.ref_point)
         res = minimize(
             self.problem,
             algorithm,
             termination,
             seed=self.seed,
             verbose=False,
-            callback=TqdmCallback(self.n_max_gen),
+            callback=self.convergence,
         )
         pareto_front = self._unpack_results(res)
         return pareto_front

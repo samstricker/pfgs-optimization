@@ -1,16 +1,43 @@
 """"""
 
 import logging as log
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import polars as pl
 
 from paretodo import InvestigationSpace, OptimizationProblem, ParetoSelector
 
 from helpers.logger import set_logger
-
+from ..problems.digital_biolab_simulator import DigitalBioLabSimulator
+from ..problems.hb_butterot_simulator import HimmelblauButterotSimulator
+from ..data.dataset import Dataset
 
 set_logger()
+
+
+
+def df_to_dataset(df: pl.DataFrame, investigation_space: InvestigationSpace) -> Dataset:
+    """Convert a Polars DataFrame to a Dataset object.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        The input DataFrame containing the recipe data.
+
+    Returns
+    -------
+    Dataset
+        A Dataset object containing the recipe data.
+    """
+    if df.is_empty():
+        raise ValueError("The input DataFrame is empty.")
+    x_data = df.select(investigation_space.labels).to_numpy()
+    recipe_dataset = Dataset(
+        x_data=x_data,
+        x_labels=investigation_space.labels,
+        dataset_type="recipes",
+    )
+    return recipe_dataset
 
 
 def select_hitl_recipes(pareto_df: pl.DataFrame, iteration: int) -> pl.DataFrame:
@@ -84,3 +111,107 @@ def discard_regions(
             max_value = float(max_val)
             restricted_pareto = restricted_pareto.filter(pl.col(column) <= max_value)
     return restricted_pareto
+
+
+def select_pareto_expert(
+        pareto_df: pl.DataFrame,
+        iteration: int,
+        discard_values: Dict[str, List[str]],
+        investigation_space: InvestigationSpace,
+        optimization_problem: OptimizationProblem,
+        n_samples: int,
+        simulator: Union[DigitalBioLabSimulator, HimmelblauButterotSimulator],
+        expert_type: str = "expert" # "expert" or "noob"
+) -> pl.DataFrame:
+    # Selection of Recipes with the best true performance in the Pareto Front
+    # Data Leakage is expected here, as the true performance is used to select the best recipes
+    # this will only work for the first standard_deviation optimization axis in the optimization problem
+    pareto_df = discard_regions(pareto_df, discard_values, iteration)
+
+    pareto_recipe_dataset = df_to_dataset(pareto_df, investigation_space)
+    pareto_experiment_dataset = simulator.run_simulation(pareto_recipe_dataset)
+    for axis in optimization_problem.problem:
+        if axis.optimization_type == "objective":
+            obj_idx = pareto_experiment_dataset.y_labels.index(axis.var_name)
+            if pareto_experiment_dataset.y_data is None:
+                raise ValueError("The experiment dataset has no y_data.")
+            pareto_df = pareto_df.with_columns(
+                pl.Series(
+                    name=f"true_{axis.var_name}",
+                    values=pareto_experiment_dataset.y_data[:, obj_idx],
+                )
+            )
+            if axis.minimize:
+                pareto_df = pareto_df.sort(f"true_{axis.var_name}", descending=False)
+                if expert_type == "noob":
+                    pareto_df = pareto_df.sort(f"true_{axis.var_name}", descending=True)
+            else:
+                pareto_df = pareto_df.sort(f"true_{axis.var_name}", descending=True)
+                if expert_type == "noob":
+                    pareto_df = pareto_df.sort(f"true_{axis.var_name}", descending=False)
+            if n_samples > pareto_df.height:
+                raise ValueError(
+                    f"Requested number of samples ({n_samples}) exceeds the number of available recipes in the Pareto front ({pareto_df.height})."
+                )
+            return pareto_df.head(n_samples)
+
+
+def select_pareto_explore(
+    pareto_df: pl.DataFrame,
+    iteration: int,
+    discard_values: Dict[str, List[str]],
+    optimization_problem: OptimizationProblem,
+    n_samples: int,
+) -> pl.DataFrame:
+    # Selection of Recipes with the Highest Variance in the Pareto Front
+    # this will only work for the first standard_deviation optimization axis in the optimization problem
+    pareto_df = discard_regions(pareto_df, discard_values, iteration)
+
+    for axis in optimization_problem.problem:
+        name = "obj:"
+        if axis.optimization_type == "standard_deviation":
+            if axis.minimize:
+                name += "min("
+            else:
+                name += "max("
+            name += f"σ({axis.var_name}))"
+            if axis.minimize:
+                pareto_df = pareto_df.sort(name, descending=False)
+            else:
+                pareto_df = pareto_df.sort(name, descending=True)
+            if n_samples > pareto_df.height:
+                raise ValueError(
+                    f"Requested number of samples ({n_samples}) exceeds the number of available recipes in the Pareto front ({pareto_df.height})."
+                )
+            return pareto_df.head(n_samples)
+
+
+def select_pareto_exploit(
+    pareto_df: pl.DataFrame,
+    iteration: int,
+    discard_values: Dict[str, List[str]],
+    optimization_problem: OptimizationProblem,
+    n_samples: int,
+) -> pl.DataFrame:
+    # Selection of the Highest Performing Recipe (Mean Value) from the Pareto Front
+    # this will only work for the first objective optimization axis in the optimization problem
+    
+    pareto_df = discard_regions(pareto_df, discard_values, iteration)
+    for axis in optimization_problem.problem:
+        name = "obj:"
+        if axis.optimization_type == "objective":
+            if axis.minimize:
+                name += "min("
+            else:
+                name += "max("
+            name += f"μ({axis.var_name}))"
+            if axis.minimize:
+                pareto_df = pareto_df.sort(name, descending=False)
+            else:
+                pareto_df = pareto_df.sort(name, descending=True)
+            if n_samples > pareto_df.height:
+                raise ValueError(
+                    f"Requested number of samples ({n_samples}) exceeds the number of available recipes in the Pareto front ({pareto_df.height})."
+                )
+            return pareto_df.head(n_samples)
+

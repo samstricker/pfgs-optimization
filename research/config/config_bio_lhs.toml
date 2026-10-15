@@ -1,12 +1,12 @@
 [parameters]
-name = "Test_NewRepo_Bio-11-08-2026"
+name = "Rev-Benchmark_Opt-15-09-2026"
 problem = "bio"
 algorithm = "lhs"
-initial_samples = 500
+initial_samples = 10
 sampling_mode = "automatic"
-n_iterations = 1
+n_iterations = 30
 batch_size = 1
-seed = 11
+seed = 55
 meshgrid_points_per_dim = 5
 
 [parameters.dbiolab]
@@ -19,5 +19,5 @@ mammalian_recipe = "research/.local/dbiolab_defaults/recipe.json"
 
 [files]
 investigation_space = "research/.local/bio_is/is_6d.json"
-optimization_problem = "research/.local/bio_opt/bio_mean_std_r_cpurity.json"
+optimization_problem = "research/.local/bio_opt/bio_mean_std.json"
 testsets = []

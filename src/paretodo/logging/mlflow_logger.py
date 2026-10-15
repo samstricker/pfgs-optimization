@@ -94,10 +94,15 @@ class MlFlowLogger:
             artifact_name = "selected_recipes.csv"
         elif datatype.lower() == "manufacturing_front":
             artifact_name = "manufacturing_front_predictions.csv"
+        elif datatype.lower() == "pareto_convergence":
+            artifact_name = "pareto_front_convergence.csv"
+        elif datatype.lower() == "manufacturing_convergence":
+            artifact_name = "manufacturing_front_convergence.csv"
         else:
             raise ValueError(
                 f"Unsupported datatype: {datatype}. Supported types are:"
-                "experiments, meshgrid, pareto_front, selected_recipes, manufacturing_front."
+                "experiments, meshgrid, pareto_front, selected_recipes, manufacturing_front,"
+                " pareto_convergence, manufacturing_convergence."
             )
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_csv_path = os.path.join(temp_dir, artifact_name)
