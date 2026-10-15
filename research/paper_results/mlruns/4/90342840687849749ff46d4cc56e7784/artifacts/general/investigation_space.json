@@ -1,0 +1,46 @@
+{
+    "variables": [
+        {
+            "name": "temperature",
+            "min": 30.0,
+            "max": 40.0,
+            "discretization": 0.001,
+            "expected_error": 0.1
+        },
+        {
+            "name": "ph_value",
+            "min": 6.0,
+            "max": 8.0,
+            "discretization": 0.001,
+            "expected_error": 0.2
+        },
+        {
+            "name": "initial_glc",
+            "min": 0.0,
+            "max": 4.0,
+            "discretization": 0.001,
+            "expected_error": 0.05
+        },
+        {
+            "name": "initial_gln",
+            "min": 0.0,
+            "max": 4.0,
+            "discretization": 0.001,
+            "expected_error": 0.05
+        },
+        {
+            "name": "feed_1_glc",
+            "min": 0.0,
+            "max": 4.0,
+            "discretization": 0.001,
+            "expected_error": 0.05
+        },
+        {
+            "name": "feed_1_gln",
+            "min": 0.0,
+            "max": 4.0,
+            "discretization": 0.001,
+            "expected_error": 0.05
+        }
+    ]
+}
