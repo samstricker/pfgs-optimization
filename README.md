@@ -12,6 +12,12 @@ uv sync
 
 Requires Python >= 3.11.
 
+To run the research code (paper experiments, tutorial), also install the `research` group. This pulls the [Digital BioLab simulator](https://github.com/samstricker/digital_biolab) (`dbiolab`) from GitHub:
+
+```bash
+uv sync --group research
+```
+
 ---
 
 ## File Structure
