@@ -1,0 +1,23 @@
+[parameters]
+name = "Rev-Benchmark_Opt-15-09-2026"
+problem = "bio"
+algorithm = "lhs"
+initial_samples = 10
+sampling_mode = "automatic"
+n_iterations = 30
+batch_size = 1
+seed = 55
+meshgrid_points_per_dim = 5
+
+[parameters.dbiolab]
+seed = 11
+objective_time = "end_of_batch"
+visualize = "false"
+reactor = "research/.local/dbiolab_defaults/MTP_1.json"
+mammalian_recipe = "research/.local/dbiolab_defaults/recipe.json"
+
+
+[files]
+investigation_space = "research/.local/bio_is/is_6d.json"
+optimization_problem = "research/.local/bio_opt/bio_mean_std.json"
+testsets = []

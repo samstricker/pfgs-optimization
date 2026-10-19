@@ -1,0 +1,2 @@
+RecipeID,temperature,ph_value,initial_glc,initial_gln,feed_1_glc,feed_1_gln,product_concentration,aggregate_concentration,purity,obj:max(μ(product_concentration)),obj:max(σ(product_concentration))
+1,35.3925,6.0,4.0,3.8,0.0,0.0,661.1336234438307,0.4464424627275889,0.671114980489556,661.1336234438307,366.5869610416626

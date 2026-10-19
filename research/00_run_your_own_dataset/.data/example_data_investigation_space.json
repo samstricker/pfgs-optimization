@@ -1,0 +1,32 @@
+{
+    "variables": [
+        {
+            "name": "x1",
+            "min": 50.0,
+            "max": 95.0,
+            "discretization": 5.0,
+            "expected_error": 0.1
+        },
+        {
+            "name": "x2",
+            "min": 5.0,
+            "max": 60.0,
+            "discretization": 1.0,
+            "expected_error": 0.1
+        },
+        {
+            "name": "x3",
+            "min": 2.0,
+            "max": 5.0,
+            "discretization": 0.5,
+            "expected_error": 0.1
+        },
+        {
+            "name": "x4",
+            "min": 0.5,
+            "max": 2.0,
+            "discretization": 0.1,
+            "expected_error": 0.1
+        }
+    ]
+}

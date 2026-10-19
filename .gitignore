@@ -1,0 +1,12 @@
+# Local Data
+.python*
+**/.local/**
+**/__pycache__/**
+*.egg*
+build/*
+.temp/*
+mlruns/*
+mlflow.db
+*report.log
+*.temp
+*.DS_Store

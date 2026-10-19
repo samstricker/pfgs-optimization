@@ -1,0 +1,38 @@
+[project]
+name = "paretodo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "dash>=4.1.0",
+    "kaleido>=1.3.0",
+    "mlflow>=3.11.1",
+    "numpy>=2.4.4",
+    "polars>=1.40.0",
+    "pymoo>=0.6.1.6",
+    "pyswarms>=1.3.0",
+    "scipy>=1.17.1",
+]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src", "research"]
+include = ["paretodo*", "helpers*"]
+
+[tool.uv.sources]
+dbiolab = { git = "https://github.com/samstricker/digital_biolab", branch = "main" }
+
+[dependency-groups]
+dev = ["black>=26.3.1", "mypy>=1.20.1", "pylint>=4.0.5", "pytest>=9.0.3"]
+
+research = [
+    "botorch>=0.18.1",
+    "dbiolab>=0.1.0",
+    "ipykernel>=7.3.0",
+    "pydoe3>=1.6.2",
+    "toml>=0.10.2",
+]

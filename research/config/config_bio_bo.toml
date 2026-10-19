@@ -1,0 +1,29 @@
+[parameters]
+name = "Rev-Benchmark_OptC-15-09-2026"
+problem = "bio"
+algorithm = "bo"
+initial_samples = 10
+sampling_mode = "NONE"
+n_iterations = 30
+batch_size = 1
+seed = 55
+meshgrid_points_per_dim = 3
+
+[parameters.dbiolab]
+seed = 11
+objective_time = "end_of_batch"
+visualize = "false"
+reactor = "research/.local/dbiolab_defaults/MTP_1.json"
+mammalian_recipe = "research/.local/dbiolab_defaults/recipe.json"
+
+[parameters.bo_config]
+acquisition_function = "UCB"
+best_f = "auto"
+num_restarts = 10
+raw_samples = 301
+beta = 1.96
+
+[files]
+investigation_space = "research/.local/bio_is/is_6d.json"
+optimization_problem = "research/.local/bio_opt/bio_mean_std_cpurity.json"
+testsets = []
