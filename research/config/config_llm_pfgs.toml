@@ -1,0 +1,32 @@
+[parameters]
+name = "hb_llm"
+problem = "himmelblau"
+algorithm = "pfgs"
+initial_samples = 11
+sampling_mode = "llm_selector"
+n_iterations = 10
+batch_size = 1
+seed = 11
+meshgrid_points_per_dim = 20
+
+[parameters.nsga2_config]
+robustness_confidence = 0.95
+pop_size_per_dim = 50
+n_max_gen = 200
+seed = 11
+
+[parameters.discard_values]
+
+[parameters.llm_config]
+n_votes = 10
+max_calls = 30
+threshold = 0.50
+
+[files]
+investigation_space = "research/.local/himmelblau/is_llm.json"
+optimization_problem = "research/.local/himmelblau/op_llm.json"
+testsets = [
+    "research/.local/himmelblau/testset_full.csv",
+    "research/.local/himmelblau/testset_objective.csv"
+]
+prompt = "research/prompts/selector_v1.md"
