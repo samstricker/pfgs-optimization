@@ -3,9 +3,19 @@
 import json
 import logging as log
 from collections import Counter
+import math
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import polars as pl
+from pydantic import BaseModel, ValidationError
+
+
+class LLMResponse(BaseModel):
+    """Structured answer expected from the LLM."""
+
+    reasoning: Optional[str]
+    recipe_id: int
+    candidate_points: Dict[str, float]
 
 
 class LLMSelector:
@@ -15,6 +25,7 @@ class LLMSelector:
         self,
         pareto_front: pl.DataFrame,
         prompt_instructions: str,
+        column_labels: List[str],
         ask: Callable[[str], str],
         *,
         n_votes: int = 10,
@@ -30,6 +41,7 @@ class LLMSelector:
             pareto_front (pl.DataFrame): DataFrame containing the Pareto front recipes
                 with a "RecipeID" column.
             prompt_instructions (str): Instructions for the LLM.
+            column_labels (List[str]): Column labels from Investigation Space.
             ask (Callable[[str], str]): Function that sends a prompt to the model and
                 returns its text answer.
             n_votes (int): Number of valid answers to collect.
@@ -45,9 +57,8 @@ class LLMSelector:
         stats: Dict[str, Any] = {
             "n_calls": 0,
             "n_invalid": 0,
-            "invalid_answers": [],
-            "invalid_ids": [],
             "votes": [],
+            "response": [],
         }
 
         valid_ids = pareto_front["RecipeID"].to_list()
@@ -56,13 +67,25 @@ class LLMSelector:
         while len(stats["votes"]) < n_votes and stats["n_calls"] < max_calls:
             answer = ask(prompt)
             stats["n_calls"] += 1
-            vote, valid = self.parse_answer(answer, valid_ids)
-            if not valid:
+            response, valid = self.parse_answer(
+                answer=answer,
+                valid_ids=valid_ids,
+                pareto_front=pareto_front,
+                column_labels=column_labels,
+            )
+            stats["response"].append(
+                {
+                    "recipe_id": None if response is None else response.recipe_id,
+                    "reasoning": None if response is None else response.reasoning,
+                    "valid": valid,
+                    "raw_answer": answer,
+                }
+            )
+
+            if response is None or not valid:
                 stats["n_invalid"] += 1
-                stats["invalid_answers"].append(answer)
-                stats["invalid_ids"].append(vote)
             else:
-                stats["votes"].append(vote)
+                stats["votes"].append(response.recipe_id)
 
         log.info(
             "LLM calls: %d, valid votes: %d, invalid answers: %d",
@@ -94,7 +117,9 @@ class LLMSelector:
         Returns:
             pareto_front_json (str): JSON list of recipes, each including its "RecipeID".
         """
-        pareto_front_json = json.dumps(pareto_front.to_dicts(), indent=2)
+        pareto_front_json = json.dumps(
+            pareto_front.to_dicts(), indent=2, ensure_ascii=False
+        )
         return pareto_front_json
 
     def build_prompt(self, prompt_instructions: str, pareto_front: pl.DataFrame) -> str:
@@ -113,33 +138,64 @@ class LLMSelector:
         return prompt
 
     def parse_answer(
-        self, answer: str, valid_ids: List[int]
-    ) -> Tuple[Optional[int], bool]:
-        """Extract the recipe ID from an answer and check it is on the Pareto front.
+        self,
+        answer: str,
+        valid_ids: List[int],
+        pareto_front: pl.DataFrame,
+        column_labels: List[str],
+    ) -> Tuple[Optional[LLMResponse], bool]:
+        """Parse an answer and check it matches a recipe on the Pareto front.
 
         Parameters:
-            answer (str): Raw text answer, expected as ``{"recipe_id": <int>}``.
+            answer (str): Raw text answer, expected to match ``LLMResponse``.
             valid_ids (List[int]): Recipe IDs on the Pareto front.
+            pareto_front (pl.DataFrame): DataFrame containing the Pareto front recipes.
+            column_labels (List[str]): Column labels from Investigation Space.
 
         Returns:
-            recipe_id (Optional[int]): The recipe ID, or None if the answer is malformed.
+            response (Optional[LLMResponse]): The parsed answer, or None if the
+                answer is malformed.
             valid (bool): Whether the answer is valid.
         """
         valid = True
 
         try:
-            recipe_id = int(json.loads(answer)["recipe_id"])
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            response = LLMResponse.model_validate_json(answer)
+        except ValidationError:
             valid = False
             log.warning("Could not parse LLM answer: %s", answer)
             return None, valid
-        if recipe_id not in valid_ids:
+
+        if response.recipe_id not in valid_ids:
             valid = False
             log.warning(
-                "LLM picked recipe %d, which is not on the Pareto front.", recipe_id
+                "LLM picked recipe %d, which is not on the Pareto front.",
+                response.recipe_id,
             )
-            return recipe_id, valid
-        return recipe_id, valid
+            return response, valid
+
+        if set(response.candidate_points) != set(column_labels):
+            valid = False
+            log.warning(
+                "Candidate point labels %s do not match investigation space labels.",
+                list(response.candidate_points),
+            )
+            return response, valid
+
+        row = pareto_front.filter(pl.col("RecipeID") == response.recipe_id).row(
+            0, named=True
+        )
+        for col in column_labels:
+            if not math.isclose(response.candidate_points[col], row[col], abs_tol=1e-6):
+                valid = False
+                log.warning(
+                    "LLM value for %s does not match recipe %d.",
+                    col,
+                    response.recipe_id,
+                )
+                return response, valid
+
+        return response, valid
 
     def pick_majority(self, votes: List[int], threshold: float) -> Optional[int]:
         """Return the most common recipe ID if it got enough of the votes.
