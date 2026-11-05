@@ -188,8 +188,10 @@ def main():
         selected_recipes, stats = select_llm_recipes(
             pareto_df=pareto_df,
             prompt_instructions=prompt_instructions,
+            column_labels=investigation_space.labels,
             ask=make_random_ask(
-                valid_ids=pareto_df["RecipeID"].to_list(),
+                pareto_front=pareto_df,
+                column_labels=investigation_space.labels,
                 seed=config["seed"] + iteration,
                 p_invalid=0.5,
             ),
