@@ -18,8 +18,6 @@ from helpers.sampling.sampling_pfgs import sample_pfgs
 from helpers.sampling.selection_llm import select_llm_recipes
 from helpers.data.metrics import calculate_rrmse
 from helpers.data.testset import load_testset
-from helpers.rng import make_random_ask
-
 
 from paretodo import (
     MlFlowLogger,
@@ -50,6 +48,7 @@ def main():
     ml_logger.log_investigation_space(investigation_space)
     ml_logger.add_tag("Algorithm", config["algorithm"])
     ml_logger.add_tag("Problem", config["problem"])
+    ml_logger.add_tag("Provider", config["llm"]["provider"])
 
     log.info("Generating initial samples using Latin Hypercube Sampling...")
     initial_samples = lhs_sampling(
@@ -115,7 +114,7 @@ def main():
             iteration=iteration,
         )
 
-        log.info("Training surrogate model using testset...")
+        log.info("Testing surrogate model using testset...")
         n_experiments = len(experiment_dataset.x_data)
         for file in files["testsets"]:
             testset_name = Path(file).stem
@@ -189,13 +188,8 @@ def main():
             pareto_df=pareto_df,
             prompt_instructions=prompt_instructions,
             column_labels=investigation_space.labels,
-            ask=make_random_ask(
-                pareto_front=pareto_df,
-                column_labels=investigation_space.labels,
-                seed=config["seed"] + iteration,
-                p_invalid=0.5,
-            ),
-            llm_config=config["llm_config"],
+            llm_config=config["llm"],
+            seed=config["seed"] + iteration,
         )
 
         if stats is not None:
@@ -217,9 +211,7 @@ def main():
                 optimization_problem=optimization_problem,
                 n_samples=config["batch_size"],
             )
-            if selected_recipes.is_empty():
-                log.info("No more recipes to select. Ending optimization loop.")
-                break
+
         if selected_recipes.is_empty():
             log.info("No more recipes to select. Ending optimization loop.")
             break
