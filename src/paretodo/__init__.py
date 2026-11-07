@@ -8,7 +8,7 @@ from .data_models import (
 )
 from .sampling import BaseProblem, ParetoFrontGenerator
 from .logging import MlFlowLogger
-from .selection import ParetoSelector, LLMSelector
+from .selection import ParetoSelector, LLMSelector, ask_server
 
 __all__ = [
     "BaseProblem",
@@ -20,4 +20,5 @@ __all__ = [
     "ParetoFrontGenerator",
     "ParetoSelector",
     "LLMSelector",
+    "ask_server",
 ]
