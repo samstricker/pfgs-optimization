@@ -49,6 +49,8 @@ def main():
     ml_logger.add_tag("Algorithm", config["algorithm"])
     ml_logger.add_tag("Problem", config["problem"])
     ml_logger.add_tag("Provider", config["llm"]["provider"])
+    if config["llm"]["provider"] != "random":
+        ml_logger.add_tag("Model", config["llm"]["model"])
 
     log.info("Generating initial samples using Latin Hypercube Sampling...")
     initial_samples = lhs_sampling(
@@ -201,6 +203,11 @@ def main():
                 dictionary=stats, artifact_file=f"Iteration_{iteration:03d}/stats.json"
             )
 
+        ml_logger.log_metric(
+            name="used_fallback",
+            value=int(selected_recipes is None),
+            step=iteration,
+        )
         if selected_recipes is None:
             log.info("No recipe selected by LLM. Fallback to automatic selection...")
             selected_recipes = select_automatic_recipes(
