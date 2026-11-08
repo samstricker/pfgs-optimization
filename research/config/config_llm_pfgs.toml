@@ -4,9 +4,9 @@ problem = "himmelblau"
 algorithm = "pfgs"
 initial_samples = 5
 sampling_mode = "llm_selector"
-n_iterations = 95
+n_iterations = 10
 batch_size = 1
-seed = 5
+seed = 25
 meshgrid_points_per_dim = 20
 
 [parameters.nsga2_config]
@@ -18,16 +18,17 @@ seed = 11
 [parameters.discard_values]
 
 [parameters.llm]
-provider = "random"
+provider = "server"
 p_invalid = 0.0
 model = "qwen3.5:2b"
 base_url = "http://localhost:11434/v1"
 n_votes = 1
 max_calls = 1
-threshold = 0.51
+threshold = 0
 
 [parameters.llm.options]
-# temperature = 0
+reasoning_effort = "none"
+temperature = 0
 
 [files]
 investigation_space = "research/.local/himmelblau/is_llm.json"
