@@ -28,7 +28,10 @@ def make_random_ask(
             a random answer.
     """
     rng = random.Random(seed)
-    recipes = pareto_front.to_dicts()
+
+    recipes = pareto_front.unique(
+        subset=column_labels, keep="first", maintain_order=True
+    ).to_dicts()
 
     def ask(prompt: str) -> str:  # pylint: disable=unused-argument
         recipe = rng.choice(recipes)
