@@ -79,10 +79,30 @@ def test_pareto_to_json_keeps_special_characters(selector, pareto_front):
 
 def test_build_prompt_puts_front_after_instructions(selector, pareto_front):
     """The prompt should be the instructions followed by the Pareto front."""
-    prompt = selector.build_prompt("Pick a recipe.", pareto_front)
+    prompt = selector.build_prompt("Pick a recipe.", pareto_front, COLUMN_LABELS)
 
     assert prompt.startswith("Pick a recipe.\n\n")
-    assert selector.pareto_to_json(pareto_front) in prompt
+    recipes = json.loads(prompt.removeprefix("Pick a recipe.\n\n"))
+    assert [recipe["RecipeID"] for recipe in recipes] == VALID_IDS
+
+
+def test_build_prompt_keeps_only_needed_columns(selector, pareto_front):
+    """Only RecipeID, inputs and objectives are sent, with rounded objectives."""
+    front = pareto_front.with_columns(
+        pl.lit(9.0).alias("side_product"),
+        pl.Series("obj:max(μ(yield))", [1.23456, 2.0, 3.0]),
+    )
+
+    prompt = selector.build_prompt("Pick.", front, COLUMN_LABELS)
+    recipes = json.loads(prompt.removeprefix("Pick.\n\n"))
+
+    assert list(recipes[0]) == [
+        "RecipeID",
+        "temperature",
+        "ph_value",
+        "obj:max(μ(yield))",
+    ]
+    assert recipes[0]["obj:max(μ(yield))"] == 1.23
 
 
 def test_parse_answer_valid(selector, pareto_front):
@@ -223,7 +243,9 @@ def test_select_recipes_sends_prompt_with_front(selector, pareto_front):
         pareto_front, "Pick a recipe.", COLUMN_LABELS, ask, n_votes=3
     )
 
-    assert ask.prompts[0] == selector.build_prompt("Pick a recipe.", pareto_front)
+    assert ask.prompts[0] == selector.build_prompt(
+        "Pick a recipe.", pareto_front, COLUMN_LABELS
+    )
 
 
 def test_select_recipes_retries_invalid_answers(selector, pareto_front):
@@ -311,3 +333,60 @@ def test_select_recipes_no_consensus(selector, pareto_front):
 
     assert selected is None
     assert stats["votes"] == [0, 1, 2, 0]
+
+
+def test_select_recipes_removes_duplicate_points(selector, pareto_front):
+    """Duplicate points are sent once, keeping the first RecipeID."""
+    duplicate = pareto_front.filter(pl.col("RecipeID") == 1).with_columns(
+        pl.lit(3, dtype=pl.Int64).alias("RecipeID")
+    )
+    front = pl.concat([pareto_front, duplicate])
+    ask = make_ask([answer(1)] * 2)
+
+    selected, _ = selector.select_recipes(
+        front, "Pick a recipe.", COLUMN_LABELS, ask, n_votes=2
+    )
+    recipes = json.loads(ask.prompts[0].removeprefix("Pick a recipe.\n\n"))
+
+    assert [recipe["RecipeID"] for recipe in recipes] == VALID_IDS
+    assert selected["RecipeID"].to_list() == [1]
+
+
+def test_select_recipes_duplicate_id_is_invalid(selector, pareto_front):
+    """The RecipeID of a removed duplicate is not a valid answer."""
+    duplicate = pareto_front.filter(pl.col("RecipeID") == 1).with_columns(
+        pl.lit(3, dtype=pl.Int64).alias("RecipeID")
+    )
+    front = pl.concat([pareto_front, duplicate])
+    ask = make_ask([answer(3, RECIPE_POINTS[1])])
+
+    _, stats = selector.select_recipes(
+        front, "Pick a recipe.", COLUMN_LABELS, ask, n_votes=1, max_calls=1
+    )
+
+    assert stats["n_invalid"] == 1
+
+
+@pytest.mark.parametrize(
+    "answers, n_votes, threshold, outcome",
+    [
+        ([answer(1)] * 2, 2, 0.5, "selected"),
+        (["garbage"] * 2, 2, 0.5, "not_enough_votes"),
+        ([answer(0), answer(1)], 2, 0.75, "no_majority"),
+    ],
+)
+def test_select_recipes_records_outcome(
+    selector, pareto_front, answers, n_votes, threshold, outcome
+):
+    """The stats say whether a recipe was selected, and if not, why."""
+    _, stats = selector.select_recipes(
+        pareto_front,
+        "Pick a recipe.",
+        COLUMN_LABELS,
+        make_ask(answers),
+        n_votes=n_votes,
+        max_calls=2,
+        threshold=threshold,
+    )
+
+    assert stats["outcome"] == outcome

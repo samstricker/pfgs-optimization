@@ -13,7 +13,7 @@ from pydantic import BaseModel, ValidationError
 class LLMResponse(BaseModel):
     """Structured answer expected from the LLM."""
 
-    reasoning: Optional[str]
+    reasoning: str
     recipe_id: int
     candidate_points: Dict[str, float]
 
@@ -59,10 +59,14 @@ class LLMSelector:
             "n_invalid": 0,
             "votes": [],
             "response": [],
+            "outcome": None,
         }
 
+        pareto_front = pareto_front.unique(
+            subset=column_labels, keep="first", maintain_order=True
+        )
         valid_ids = pareto_front["RecipeID"].to_list()
-        prompt = self.build_prompt(prompt_instructions, pareto_front)
+        prompt = self.build_prompt(prompt_instructions, pareto_front, column_labels)
 
         while len(stats["votes"]) < n_votes and stats["n_calls"] < max_calls:
             answer = ask(prompt)
@@ -97,14 +101,17 @@ class LLMSelector:
 
         if len(stats["votes"]) < n_votes:
             log.info("Reached %d calls without %d valid votes.", max_calls, n_votes)
+            stats["outcome"] = "not_enough_votes"
             return None, stats
 
         winner = self.pick_majority(stats["votes"], threshold)
         if winner is None:
             log.info("No LLM consensus.")
+            stats["outcome"] = "no_majority"
             return None, stats
 
         log.info("LLM selected recipe %d.", winner)
+        stats["outcome"] = "selected"
         recipe_id_row = pareto_front.filter(pl.col("RecipeID") == winner)
         return recipe_id_row, stats
 
@@ -122,19 +129,32 @@ class LLMSelector:
         )
         return pareto_front_json
 
-    def build_prompt(self, prompt_instructions: str, pareto_front: pl.DataFrame) -> str:
+    def build_prompt(
+        self,
+        prompt_instructions: str,
+        pareto_front: pl.DataFrame,
+        column_labels: List[str],
+        decimals: int = 2,
+    ) -> str:
         """Builds the prompt to be passed into the LLM. Combines prompt instructions
-        with Pareto front points converted into JSON text.
+        with the Pareto front converted into JSON text. Only the RecipeID, the input
+        columns and the rounded objective columns are passed to the LLM.
 
         Parameters:
             prompt_instructions (str): Instructions for the LLM taken from the prompt
                 config file.
             pareto_front (pl.DataFrame): DataFrame containing the Pareto front recipes.
+            column_labels (List[str]): Column labels from Investigation Space.
+            decimals (int): Number of decimals the objective values are rounded to.
 
         Returns:
             prompt (str): Built prompt to be passed into the LLM.
         """
-        prompt = prompt_instructions + "\n\n" + self.pareto_to_json(pareto_front)
+        objective_cols = [col for col in pareto_front.columns if col.startswith("obj")]
+        prompt_front = pareto_front.select(
+            ["RecipeID", *column_labels, *objective_cols]
+        ).with_columns(pl.col(objective_cols).round(decimals))
+        prompt = prompt_instructions + "\n\n" + self.pareto_to_json(prompt_front)
         return prompt
 
     def parse_answer(
