@@ -4,7 +4,7 @@ import datetime as dt
 import os
 from pathlib import Path
 import tempfile
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import mlflow as mlf
 import polars as pl
@@ -159,6 +159,18 @@ class MlFlowLogger:
             Timestep to log it to
         """
         mlf.log_metric(key=name, value=value, step=step)
+
+    def log_dict(self, dictionary: Dict[str, Any], artifact_file: str):
+        """Save dictionary to mlflow artifact.
+
+        Parameters
+        ----------
+        dictionary : Dict[str, Any]
+            Dictionary to log
+        artifact_file : str
+            Path to the artifact.
+        """
+        mlf.log_dict(dictionary=dictionary, artifact_file=artifact_file)
 
     def end_run(self):
         """End the mlflow run."""
